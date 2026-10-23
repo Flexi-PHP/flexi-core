@@ -87,7 +87,7 @@ Este listener:
 ```php
 class RouteNotFoundListener implements EventListenerInterface
 {
-    public function handleEvent(EventInterface $event)
+    public function handle(EventInterface $event): void
     {
         if (!$event instanceof RouteNotFoundEvent) {
             return;

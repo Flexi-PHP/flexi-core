@@ -244,7 +244,7 @@ Events and listeners are defined in the `listeners.json` file. This file maps ev
 __Note:__
 
 - The `event` key can be a specific event name or a wildcard `*` to listen to all events.
-- The listener class should implement the `Flexi\Domain\Interfaces\EventListenerInterface` interface.
+- The listener class should implement `Flexi\Contracts\Interfaces\EventListenerInterface` or extend the `Flexi\Contracts\Classes\EventListener` base class. Its `handle()` method receives an `EventInterface` and returns `void`.
 
 ### Queries
 
