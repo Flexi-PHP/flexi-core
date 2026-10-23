@@ -14,7 +14,7 @@ use Flexi\Contracts\Interfaces\LoggerInterface;
  * Module detector for vendor-installed packages.
  *
  * Detects modules installed via Composer by scanning composer.json files
- * for 'extra.flexi-module' metadata. Uses intelligent caching based on
+ * for Flexi module metadata in Composer's extra section. Uses intelligent caching based on
  * composer.lock modification time to improve performance.
  */
 class VendorModuleDetector implements ModuleDetectorInterface
@@ -276,15 +276,17 @@ class VendorModuleDetector implements ModuleDetectorInterface
             return null;
         }
 
-        // Check for Flexi module metadata in extra.flexi-module
-        if (!isset($data['extra']['flexi-module']) || !is_array($data['extra']['flexi-module'])) {
+        // `extra.flexi` is the canonical format used by local and published modules.
+        // Keep `extra.flexi-module` readable for packages created with the legacy format.
+        $flexiModuleData = $data['extra']['flexi'] ?? $data['extra']['flexi-module'] ?? null;
+        if (!is_array($flexiModuleData)) {
             return null;
         }
 
-        $flexiModuleData = $data['extra']['flexi-module'];
-
         // Extract module name from flexi-module metadata or derive from package name
-        $moduleName = $flexiModuleData['name'] ?? $this->deriveModuleNameFromPackage($packageName);
+        $moduleName = $flexiModuleData['module-name']
+            ?? $flexiModuleData['name']
+            ?? $this->deriveModuleNameFromPackage($packageName);
 
         return [
             'name' => $this->normalizeModuleName($moduleName),
