@@ -117,7 +117,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 ## Block 6 — Security, operations, and performance
 
-- [ ] Review required PHP extensions and dependencies; move non-universal capabilities to optional adapters when appropriate.
+- [x] Review required PHP extensions; make `ext-pcntl` optional and document that it is required only for explicitly enabled CLI async dispatch in [`runtime-requirements.md`](runtime-requirements.md).
 - [ ] Document the trust model: a Composer package executes PHP code and functional deactivation is not security isolation.
 - [ ] Separate configuration by environment and secrets; avoid unsafe example values that could be confused with production secrets.
 - [ ] Define permissions and write limits for caches, module state, and logs.

@@ -211,7 +211,29 @@ class EventBus implements EventBusInterface
      */
     public function asyncMode(): bool
     {
-        return PHP_SAPI === 'cli' && ($this->configuration->has('dispatch_mode') && (int) $this->configuration->get('dispatch_mode'));
+        $requested = PHP_SAPI === 'cli'
+            && $this->configuration->has('dispatch_mode')
+            && (int) $this->configuration->get('dispatch_mode');
+        if (!$requested) {
+            return false;
+        }
+
+        if (!$this->supportsAsyncDispatch()) {
+            throw new \RuntimeException('Asynchronous event dispatch requires ext-pcntl; install the extension or set dispatch_mode=0.');
+        }
+
+        return true;
+    }
+
+    private function supportsAsyncDispatch(): bool
+    {
+        foreach (['pcntl_fork', 'pcntl_waitpid'] as $function) {
+            if (!function_exists(__NAMESPACE__.'\\'.$function) && !function_exists($function)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function getHandlersDefinition(bool $with_aliases = false): array

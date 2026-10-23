@@ -24,7 +24,6 @@
   "require": {
     "php": ">=7.4",
     "ext-json": "*",
-    "ext-pcntl": "*",
     "composer/semver": "^3.4",
     "cubadevops/upgrader": "^1.6",
     "flexi/contracts": "^5.0",
