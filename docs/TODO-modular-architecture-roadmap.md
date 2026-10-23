@@ -84,7 +84,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Document class, alias, and factory definitions with minimal examples and supported argument types in [`service-definitions.md`](service-definitions.md).
 - [x] Define resolution by ID and by interface, including the relationship between aliases, shared instances, and factories in [`service-definitions.md`](service-definitions.md).
 - [x] Allow modules to replace core adapters through the explicit, validated service decorator mechanism; see [`service-definitions.md`](service-definitions.md) and [`configuration-load-order.md`](configuration-load-order.md).
-- [ ] Ensure removing or deactivating a module removes its definitions from the rebuilt container.
+- [x] Ensure removing or deactivating a module removes its definitions from the rebuilt container; service definitions and instances are now scoped to each container build, with a regression test for a module disappearing between builds.
 - [ ] Define cache invalidation for configuration by manifest content/version, file changes, and module state.
 - [ ] Add diagnostics that identify the source of each loaded definition and help explain conflicts.
 

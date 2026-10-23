@@ -50,9 +50,6 @@ class ContainerFactoryTest extends TestCase
         $this->cache
             ->method('get')
             ->willReturnCallback(function ($key, $default = null) {
-                if ($key === 'service_definitions') {
-                    return [];
-                }
                 return $default;
             });
 
@@ -140,9 +137,30 @@ class ContainerFactoryTest extends TestCase
         $factory = new ContainerFactory($cache, $builder, $this->servicesDefinitionParser, $this->configFilesProvider);
         $container = $factory->getInstance();
 
-        $this->assertSame('logged_mailer', $cache->get('service_definitions')['mailer'] ?? null);
         $this->assertInstanceOf(ContainerFactoryAuditedMailer::class, $container->get('mailer'));
         $this->assertSame('audited:logged:base', $container->get('mailer')->send());
+    }
+
+    public function testNewContainerDoesNotRetainDefinitionsFromPreviousBuild(): void
+    {
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturnOnConsecutiveCalls(
+            ['/modules/Optional/Config/services.json'],
+            []
+        );
+        $this->servicesDefinitionParser->method('parse')->willReturn([
+            'optional.service' => ['class' => ['name' => ContainerFactoryBaseMailer::class]],
+        ]);
+
+        $cache = new InMemoryCache();
+        $builder = new ObjectBuilder($cache);
+        $factory = new ContainerFactory($cache, $builder, $this->servicesDefinitionParser, $this->configFilesProvider);
+
+        $activeContainer = $factory->getInstance();
+        $inactiveContainer = $factory->getInstance();
+
+        $this->assertTrue($activeContainer->has('optional.service'));
+        $this->assertFalse($inactiveContainer->has('optional.service'));
     }
 
     public function testDuplicateServiceIdsAcrossFilesAreRejected(): void
