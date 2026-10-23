@@ -32,7 +32,7 @@ Container validation used PHP 7.4.33 and PHPUnit 9.6.29. The first run against 4
 
 | Consumer/API surface | Verified state | Required action |
 |---|---|---|
-| Core command and query handlers | All core `HandlerInterface` implementations and the test handlers declare `handle(DTOInterface): MessageInterface`, matching the locked 4.1 contract. | Preserve this signature for command/query handlers unless a major-version migration is explicitly planned. |
+| Core command and query handlers | All core `HandlerInterface` implementations and the test handlers declare `handle(DTOInterface): MessageInterface`, matching the locked 5.0 contract. | Preserve this signature for command/query handlers unless a major-version migration is explicitly planned. |
 | Event listeners | Contracts 5.0.0 separates `EventListenerInterface` from `HandlerInterface` and requires `handle(EventInterface): void`. | Core suite passes with the published contract package. |
 | `HandlerInterface` | Contracts 5.0.0 retains `handle(DTOInterface): MessageInterface` for command/query handlers. | Keep handler result semantics explicit and separate from event-listener semantics. |
 | Criteria test double | `DummySearchCriteria` now implements the current `CriteriaInterface` methods and supplies empty filters, an `id` order, and no pagination values. | Keep fixtures aligned with the contract API as it evolves. |
@@ -57,14 +57,16 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Choose `extra.flexi` in Composer as the source of truth for the manifest and `config-files` as the explicit list of configurations.
 - [x] Define the target compatibility matrix: canonical contracts/core are the active line; migrate existing modules after core/contracts stabilize.
 - [x] Separate event listeners from command/query handlers in the contracts source so their return semantics do not conflict; release the API change only on the 5.x contract line.
-- [ ] Define the module manifest: name, version, Flexi/PHP compatibility, dependencies, and provided capabilities.
+- [x] Define the module manifest: logical name, Composer package version, Flexi/PHP compatibility, Composer dependencies, and provided capabilities in [`module-manifest.md`](module-manifest.md).
 - [x] Use relative paths declared in `extra.flexi.config-files`; keep `Config/<type>.json` as a fallback for older modules without a list.
 - [x] Omit a configuration type if an explicit list does not declare it.
-- [ ] Align `modules/example-auth` and legacy documentation with the agreed contract.
-- [ ] Define the lifecycle explicitly: discovered, validated, dependencies resolved, active, registered, and inactive.
-- [ ] Define the observable effect of disabling a module: its services, routes, listeners, commands, and queries stop being registered.
+- [x] Mark conflicting legacy module guides as historical references and link the canonical manifest specification.
+- [ ] Align `modules/example-auth` with manifest schema v1 after core/contracts stabilization; module files are excluded from this repository by `.gitignore` and module migration is deferred by scope.
+- [x] Define the lifecycle explicitly: discovered, validated, dependencies resolved, active, registered, and inactive in [`module-lifecycle.md`](module-lifecycle.md).
+- [x] Define deactivation's observable effect: inactive modules contribute no services, routes, listeners, commands, or queries after the next application build.
+- [x] Require explicit activation: newly discovered modules initialize as inactive.
 
-**Acceptance:** a valid example module can be installed, discovered, activated, and deactivated following a single guide without editing core configuration paths.
+**Acceptance:** a valid example module can be installed, discovered, activated, and deactivated following a single guide without editing core configuration paths. The manifest schema and lifecycle are defined; applying them to the existing example is deferred until module migration, and runtime validation remains in Block 2.
 
 ## Block 2 — Configuration validation and composition
 
