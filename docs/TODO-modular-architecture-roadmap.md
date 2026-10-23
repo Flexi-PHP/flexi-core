@@ -19,17 +19,30 @@ This document turns the integration guidelines for services, routes, listeners, 
 | Surface | Observed state | Risk for contract changes |
 |---|---|---|
 | Local Flexi core | Requires `flexi/contracts >=4.1.0`; `composer.lock` pins 4.1.0. | The version range allows future versions without an upper bound; compatibility semantics must be defined and the resolved version must be tested. |
-| Local `flexi-contracts` | Branch `main`, declared version 5.0.1, PSR-4 namespace `Flexi\Contracts\`. | The local workspace is newer than what the core blocks; do not assume both repositories represent the same deployed contract. |
-| Published `flexi-contracts` | The default branch checked declares version 4.1.0 and the same package/namespace name `flexi/contracts` + `Flexi\Contracts\`. | There is divergence between the local checkout and the published version that must be resolved in the release strategy. |
+| Local `flexi-contracts` | Branch `main` is at tag `v4.1.0`, commit `33069c8`, with PSR-4 namespace `Flexi\Contracts\`. | The local checkout matches the package revision currently locked by the core. |
+| Published `flexi-contracts` | The checked default branch and tag `v4.1.0` declare package `flexi/contracts` and namespace `Flexi\Contracts\`. | Keep the package version and lockfile reference aligned when changing the contract API. |
 | Public modules | Auth, Cache, Logging, Session, 404, WebHooks, DevTools, HealthCheck, UI, and Home declare `cubadevops/flexi-contracts: @dev`; their PSR-4 prefixes remain `CubaDevOps\Flexi\Modules\...`. | The Composer requirement does not match the package required by the core (`flexi/contracts`). `@dev` also does not pin a reproducible version. |
 | Published Cache configuration | Its `Config/services.json` references IDs `CubaDevOps\Flexi\Contracts\Interfaces\CacheInterface` and `...ConfigurationInterface`. | The IDs do not match the current namespace `Flexi\Contracts`; the registration may not bind to the interfaces loaded by the core. |
+
+### Contract compatibility audit (2026-10-23)
+
+The core resolves `flexi/contracts` 4.1.0 from commit `33069c8f00af231721879057ba2671f06a4cef6c`. After the latest pull, the local `flexi-contracts` checkout is also at `v4.1.0`/`33069c8`; comparing the source trees shows they match (apart from a local `.DS_Store` file). The earlier observation that the local checkout was at 5.0.1 is obsolete and has been removed.
+
+| Consumer/API surface | Verified state | Required action |
+|---|---|---|
+| Core command and query handlers | All core `HandlerInterface` implementations and the test handlers declare `handle(DTOInterface): MessageInterface`, matching the locked 4.1 contract. | Preserve this signature for command/query handlers unless a major-version migration is explicitly planned. |
+| Event listeners | `EventListenerInterface` extends `HandlerInterface`; the published `EventListener` base class implements `handle(DTOInterface): void`. The locked 4.1 `HandlerInterface` requires `MessageInterface`, making the base class declaration incompatible when loaded. | Separate event-listener semantics from request/command handler semantics or otherwise resolve the return-type contract. Audit public modules and provide a migration path before release. |
+| `HandlerInterface` change in 4.1 | Commit `33c49b4` changed `handle(DTOInterface)` to require `MessageInterface`; this change is included in the locked 4.1.0 source. | Preserve the typed result for command/query handlers and assess the listener compatibility issue below before the next contract release. |
+| Criteria test double | `DummySearchCriteria` implements `CriteriaInterface` with obsolete methods; the current interface requires `filters`, `order`, `limit`, `offset`, and `pointer`. | Update or remove the stale fixture when criteria behavior is next covered by tests. |
+
+**Compatibility decision still needed:** define separate compatibility lines for the legacy `cubadevops/flexi-contracts` dependency and the canonical `flexi/contracts` package, identify the first core/module versions that support each line, and state whether a package/API change is patch, minor, or major. Do not loosen or tighten the core constraint until that matrix is agreed.
 
 **Compatibility rule:** changes to the central package must preserve existing contracts or introduce an explicit migration/versioning path. Adaptation of the published modules will be done later as a coordinated phase; their code and repositories are not changed here.
 
 ## Block 1 — Fix the module contract
 
 - [x] Choose `extra.flexi` in Composer as the source of truth for the manifest and `config-files` as the explicit list of configurations.
-- [ ] Define the compatibility matrix between core versions, `flexi/contracts`, and modules, including the transition from legacy package and namespace names.
+- [ ] Define the compatibility matrix between core versions, `flexi/contracts`, and modules, including the transition from legacy package and namespace names; resolve the `HandlerInterface`/`EventListener` return-type conflict.
 - [ ] Define the module manifest: name, version, Flexi/PHP compatibility, dependencies, and provided capabilities.
 - [x] Use relative paths declared in `extra.flexi.config-files`; keep `Config/<type>.json` as a fallback for older modules without a list.
 - [x] Omit a configuration type if an explicit list does not declare it.
