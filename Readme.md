@@ -14,6 +14,7 @@ leverages Dependency Injection (DI), a flexible routing system, CQRS and an even
     - [Events and Listeners](#events-and-listeners)
     - [Queries](#queries)
     - [Commands](#commands)
+    - [Load order and priority](#load-order-and-priority)
 - [Usage](#usage)
     - [Router](#router)
     - [Event System](#event-system)
@@ -267,6 +268,10 @@ Commands are defined similarly to queries in the `commands.json` file.
 __Note:__
 
 - Handlers implement `Flexi\Contracts\Interfaces\HandlerInterface`; the command identifier is the DTO class name. Module command files are declared in `extra.flexi.config-files`.
+
+### Load Order and Priority
+
+The core configuration loads first, followed by active modules sorted by logical name. You can override the module order in the root Composer manifest with `extra.flexi.module-load-order`; active modules not listed remain alphabetically ordered, while inactive and unknown names are ignored. Definitions retain their JSON array order. Flexi does not use implicit priorities to replace services, routes, handlers, or listeners: conflicts fail unless the service decorator or route override rules explicitly permit replacement. Listener priority is currently fixed; specific-event listeners run before wildcard listeners. See [Configuration Load Order and Priority](docs/configuration-load-order.md) for the complete rules and an example.
 
 ## Usage
 

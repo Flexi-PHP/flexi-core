@@ -75,7 +75,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Detect duplicate service IDs, route names and method/path pairs, and handler IDs/aliases; fail explicitly instead of silently overwriting.
 - [x] Define a deliberate policy for service replacement/decoration and route overrides; require explicit declarations and reject ambiguous decoration chains.
 - [x] Define and validate circular or incompatible dependencies between active modules before building the application. The core checks declared core compatibility, required module activation/version constraints, and dependency cycles; Composer remains responsible for resolving external packages.
-- [ ] Agree on a deterministic load order and priority resolution, and document it.
+- [x] Agree on a deterministic load order and priority resolution, and document it in [`configuration-load-order.md`](configuration-load-order.md). Core configuration loads first; the root Composer manifest may override the alphabetical order of active modules. Unlisted active modules remain alphabetical, definitions preserve file order, and conflicts require explicit decorator/route override rules. Listeners currently have equal priority and stable registration order.
 
 **Acceptance:** invalid or ambiguous configuration fails at startup with actionable diagnostics; valid configuration produces the same registration log on each execution.
 

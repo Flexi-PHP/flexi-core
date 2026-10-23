@@ -22,13 +22,17 @@ class ConfigurationFilesProvider implements ConfigurationFilesProviderInterface
 
     private ModuleStateManagerInterface $moduleStateManager;
     private HybridModuleDetector $moduleDetector;
+    private string $projectRoot;
+    private ?array $configuredModuleLoadOrder = null;
 
     public function __construct(
         ModuleStateManagerInterface $moduleStateManager,
-        HybridModuleDetector $moduleDetector
+        HybridModuleDetector $moduleDetector,
+        string $projectRoot = './'
     ) {
         $this->moduleStateManager = $moduleStateManager;
         $this->moduleDetector = $moduleDetector;
+        $this->projectRoot = rtrim($projectRoot, DIRECTORY_SEPARATOR);
     }
 
     /**
@@ -191,7 +195,118 @@ class ConfigurationFilesProvider implements ConfigurationFilesProviderInterface
             }
         }
 
+        $configuredOrder = $this->getConfiguredModuleLoadOrder();
+        $orderIndex = [];
+        foreach ($configuredOrder as $index => $moduleName) {
+            $orderIndex[strtolower($moduleName)] = $index;
+        }
+
+        usort($activeModules, static function (ModuleInfo $left, ModuleInfo $right) use ($orderIndex): int {
+            $leftOrder = $orderIndex[strtolower($left->getName())] ?? null;
+            $rightOrder = $orderIndex[strtolower($right->getName())] ?? null;
+            if ($leftOrder !== null || $rightOrder !== null) {
+                if ($leftOrder === null) {
+                    return 1;
+                }
+                if ($rightOrder === null) {
+                    return -1;
+                }
+                if ($leftOrder !== $rightOrder) {
+                    return $leftOrder <=> $rightOrder;
+                }
+            }
+
+            $nameComparison = strcasecmp($left->getName(), $right->getName());
+            if (0 !== $nameComparison) {
+                return $nameComparison;
+            }
+
+            $exactNameComparison = strcmp($left->getName(), $right->getName());
+            if (0 !== $exactNameComparison) {
+                return $exactNameComparison;
+            }
+
+            $packageComparison = strcmp($left->getPackage(), $right->getPackage());
+            if (0 !== $packageComparison) {
+                return $packageComparison;
+            }
+
+            return strcmp($left->getPath(), $right->getPath());
+        });
+
         return $activeModules;
+    }
+
+    /**
+     * Read the optional module order from the root Composer manifest.
+     * Unknown and inactive names are permitted and naturally ignored during active-module sorting.
+     *
+     * @return string[]
+     */
+    private function getConfiguredModuleLoadOrder(): array
+    {
+        if ($this->configuredModuleLoadOrder !== null) {
+            return $this->configuredModuleLoadOrder;
+        }
+
+        $composerFile = $this->projectRoot . DIRECTORY_SEPARATOR . 'composer.json';
+        if (!is_file($composerFile)) {
+            $this->configuredModuleLoadOrder = [];
+            return $this->configuredModuleLoadOrder;
+        }
+
+        try {
+            $composerData = json_decode((string) file_get_contents($composerFile), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable $exception) {
+            $this->configuredModuleLoadOrder = [];
+            return $this->configuredModuleLoadOrder;
+        }
+
+        $extra = $composerData['extra'] ?? [];
+        $flexiExtra = is_array($extra) ? ($extra['flexi'] ?? []) : [];
+        if (!is_array($flexiExtra)) {
+            throw new \RuntimeException(sprintf(
+                'Root Composer manifest "%s" extra.flexi must be an object when module-load-order is configured.',
+                $composerFile
+            ));
+        }
+        if (!array_key_exists('module-load-order', $flexiExtra)) {
+            $this->configuredModuleLoadOrder = [];
+            return $this->configuredModuleLoadOrder;
+        }
+
+        $order = $flexiExtra['module-load-order'];
+        if (!is_array($order) || array_values($order) !== $order) {
+            throw new \RuntimeException(sprintf(
+                'Root Composer manifest "%s" extra.flexi.module-load-order must be a sequential list of module names.',
+                $composerFile
+            ));
+        }
+
+        $seen = [];
+        foreach ($order as $moduleName) {
+            if (!is_string($moduleName) || '' === trim($moduleName)) {
+                throw new \RuntimeException(sprintf(
+                    'Root Composer manifest "%s" extra.flexi.module-load-order must contain non-empty module names.',
+                    $composerFile
+                ));
+            }
+
+            $normalizedName = strtolower(trim($moduleName));
+            if (isset($seen[$normalizedName])) {
+                throw new \RuntimeException(sprintf(
+                    'Root Composer manifest "%s" extra.flexi.module-load-order contains duplicate module name "%s".',
+                    $composerFile,
+                    $moduleName
+                ));
+            }
+
+            $seen[$normalizedName] = true;
+        }
+
+        $this->configuredModuleLoadOrder = array_map('trim', $order);
+
+        return $this->configuredModuleLoadOrder;
     }
 
     /**
