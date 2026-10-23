@@ -181,6 +181,27 @@ __Note:__
 - All other values are treated as the standard json_decode values.
 - The `glob` key is used to include services from `modules`.
 
+#### Service decoration
+
+Modules can wrap a service while keeping its original service ID. Give the decorator a unique ID, declare the target with `decorates`, and pass `@.inner` exactly once in its constructor or factory arguments. Decoration chains must be explicit: a second decorator targets the first decorator's ID. Duplicate IDs, missing targets, and ambiguous decoration are rejected during container construction.
+
+```json
+{
+  "services": [
+    {
+      "name": "App\\Logging\\LoggedMailer",
+      "decorates": "App\\Contracts\\MailerInterface",
+      "class": {
+        "name": "App\\Logging\\LoggedMailer",
+        "arguments": ["@.inner", "@logger"]
+      }
+    }
+  ]
+}
+```
+
+The decorated target continues to be resolved through its original ID. The `@.inner` token is reserved for service decorator arguments.
+
 ### Routes
 
 Routes are defined in the `routes.json` file. Each route specifies the HTTP method, path, and the controller that should
@@ -220,6 +241,22 @@ __Note:__
 - The optional `parameters` key is used to define how many params should be passed to the request and if they are required.
 - The optional `middlewares` key is used to define the middlewares that should be executed before the controller. They are executed in the order they are defined and can stop the execution chain if they return a response directly or pass the request to the next middleware.
 - The `glob` key is used to include additional route definitions from `modules`.
+
+Routes with duplicate names or `METHOD path` pairs fail at startup. A module can intentionally replace a route by setting `overrides` to the existing route name; the replacement must keep that same name. Routes sharing a path with different HTTP methods are supported.
+
+```json
+{
+  "routes": [
+    {
+      "name": "account.profile",
+      "overrides": "account.profile",
+      "path": "/account/profile",
+      "method": "GET",
+      "controller": "App\\Account\\ProfileController"
+    }
+  ]
+}
+```
 
 ### Events and Listeners
 

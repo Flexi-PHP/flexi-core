@@ -45,7 +45,7 @@ Use the canonical package and namespace as the sole target for the framework fou
 
 | Line | Core | Contract package | Module requirements | Status |
 |---|---|---|---|---|
-| Active development | Flexi Core next release (SemVer pipeline) | `flexi/contracts` ^5.0 | New module work uses `flexi/contracts`, `Flexi\Contracts`, and the canonical `extra.flexi` manifest. | Contracts 5.0.0 is released and locked; core version is determined from commit messages. |
+| Active development | Flexi Core next release (SemVer pipeline) | `flexi/contracts` ^5.0 | New module work uses `flexi/contracts`, `Flexi\Contracts`, and the canonical `extra.flexi` manifest. | Contracts 5.2.0 is released and locked; core version is determined from commit messages. |
 | Existing modules | Current published repositories | Legacy `cubadevops/flexi-contracts` requirement and/or `CubaDevOps\Flexi\Contracts` namespace. | Migrate Composer metadata, namespace references, manifests, and service registrations. | Migration follows core/contracts stabilization; compatibility is not a constraint in this phase. |
 
 The `EventListenerInterface` separation is a breaking change because the interface is no longer a subtype of `HandlerInterface`; it shipped in contracts 5.0.0. Keep command/query handlers message-returning. No compatibility claim is made for existing modules until they are migrated and verified.
@@ -70,10 +70,10 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 ## Block 2 — Configuration validation and composition
 
-- [x] Define machine-readable schemas for `services`, `routes`, `listeners`, `commands`, and `queries` in [`flexi/contracts`](https://github.com/Flexi-PHP/flexi-contracts/tree/v5.1.0/schemas/configuration/v1), the single source of truth for the core and modules.
+- [x] Define machine-readable schemas for `services`, `routes`, `listeners`, `commands`, and `queries` in [`flexi/contracts`](https://github.com/Flexi-PHP/flexi-contracts/tree/v5.2.0/schemas/configuration/v1), the single source of truth for the core and modules.
 - [x] Validate all active module files against the Contracts schemas before registering components; report module, file, JSON path, and validation cause.
-- [ ] Detect duplicate service IDs, names/routes, and handler registrations; fail explicitly instead of ignoring or silently overwriting.
-- [ ] Define a deliberate policy for service replacement/decoration; do not let load order accidentally decide the implementation.
+- [x] Detect duplicate service IDs, route names and method/path pairs, and handler IDs/aliases; fail explicitly instead of silently overwriting.
+- [x] Define a deliberate policy for service replacement/decoration and route overrides; require explicit declarations and reject ambiguous decoration chains.
 - [ ] Define and validate circular or incompatible dependencies between modules before building the application.
 - [ ] Agree on a deterministic load order and priority resolution, and document it.
 
@@ -93,7 +93,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 ## Block 4 — Routes and HTTP pipeline
 
 - [ ] Define the route schema: methods, patterns and parameters, name, controller, middleware, and metadata.
-- [ ] Resolve route and method conflicts at startup, with the originating module included in the error.
+- [x] Resolve route and method conflicts at startup, with the originating configuration file included in the error.
 - [ ] Define route composition by application, module, group, and individual route, including prefixes and ordering.
 - [ ] Make the pipeline use PSR-7/PSR-15 consistently and ensure middleware application does not depend on the controller extending a concrete class.
 - [ ] Resolve middleware via IDs/definitions from the container while respecting aliases, factories, and dependency injection.

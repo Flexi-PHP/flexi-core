@@ -59,7 +59,7 @@ class RouterTest extends TestCase
         $this->router->addRoute($route);
     }
 
-    public function testAddRoute(): void
+    public function testAddRouteRejectsDuplicateName(): void
     {
         $route = new Route(
             self::ROUTE_NAME,
@@ -68,8 +68,9 @@ class RouterTest extends TestCase
             'GET',
             ['test' => 'param']
         );
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Route name "health" is already registered');
         $this->router->addRoute($route);
-        $this->assertEquals(2, $this->router->route_counter);
     }
 
     public function testDispatch(): void
@@ -84,8 +85,6 @@ class RouterTest extends TestCase
             'GET',
             ['test' => 'param']
         );
-        $this->router->addRoute($route);
-
         $uriInterfaceMock = $this->createMock(UriInterface::class);
         $testHandler = new TestHttpHandler();
         $serverRequestMock = $this->createMock(ServerRequestInterface::class);
@@ -158,8 +157,8 @@ class RouterTest extends TestCase
 
         $requiredParam = 'user';
         $route = new Route(
-            self::ROUTE_NAME,
-            self::ROUTE_PATH,
+            'health.required',
+            '/health-required',
             self::ROUTE_CTRL,
             'GET',
             [
@@ -178,7 +177,7 @@ class RouterTest extends TestCase
             ->method('getUri')->willReturn($uriInterfaceMock);
 
         $uriInterfaceMock->expects($this->once())
-            ->method('getPath')->willReturn(self::ROUTE_PATH);
+            ->method('getPath')->willReturn('/health-required');
 
         $serverRequestMock->expects($this->once())
             ->method('getMethod')->willReturn('GET');
@@ -210,7 +209,7 @@ class RouterTest extends TestCase
         $uriInterfaceMock->expects($this->once())
             ->method('getPath')->willReturn(self::ROUTE_PATH);
 
-        $serverRequestMock->expects($this->exactly(2))
+        $serverRequestMock->expects($this->once())
             ->method('getMethod')->willReturn($invalidMethod);
 
         $this->expectException(\RuntimeException::class);

@@ -90,6 +90,13 @@ class CommandBusTest extends TestCase
         $this->assertEquals(TestCommandHandler::class, $this->commandBus->getHandler(TestCommand::class));
     }
 
+    public function testRegisterRejectsDuplicateHandlerId(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Handler ID');
+        $this->commandBus->register(TestCommand::class, TestCommandHandler::class);
+    }
+
     public function testGetHandlerDoesNotExist(): void
     {
         $testHandler = 'NonExistentCommand';

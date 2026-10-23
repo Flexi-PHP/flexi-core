@@ -60,10 +60,6 @@ class ContainerFactoryTest extends TestCase
             ->method('set')
             ->willReturn(true);
 
-        // Configure config files provider mock
-        $this->configFilesProvider
-            ->method('getConfigurationFiles')
-            ->willReturn([]);
     }
 
     public function testConstruct(): void
@@ -100,6 +96,47 @@ class ContainerFactoryTest extends TestCase
         $container = $factory->getInstance();
 
         $this->assertInstanceOf(Container::class, $container);
+    }
+
+    public function testServiceDecoratorReplacesTargetAndReceivesInnerService(): void
+    {
+        $files = ['/modules/Mailer/Config/services.json'];
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+        $this->configFilesProvider->expects($this->once())->method('getConfigurationFiles')->willReturn($files);
+        $this->servicesDefinitionParser->method('parse')->with($files[0])->willReturn([
+            'mailer' => ['class' => ['name' => ContainerFactoryBaseMailer::class]],
+            'logged_mailer' => [
+                'decorates' => 'mailer',
+                'class' => ['name' => ContainerFactoryLoggedMailer::class, 'arguments' => ['@.inner']],
+            ],
+            'audited_mailer' => [
+                'decorates' => 'logged_mailer',
+                'class' => ['name' => ContainerFactoryAuditedMailer::class, 'arguments' => ['@.inner']],
+            ],
+        ]);
+
+        $cache = new \Flexi\Infrastructure\Classes\InMemoryCache();
+        $builder = new \Flexi\Infrastructure\Classes\ObjectBuilder($cache);
+        $factory = new ContainerFactory($cache, $builder, $this->servicesDefinitionParser, $this->configFilesProvider);
+        $container = $factory->getInstance();
+
+        $this->assertSame('logged_mailer', $cache->get('service_definitions')['mailer'] ?? null);
+        $this->assertInstanceOf(ContainerFactoryAuditedMailer::class, $container->get('mailer'));
+        $this->assertSame('audited:logged:base', $container->get('mailer')->send());
+    }
+
+    public function testDuplicateServiceIdsAcrossFilesAreRejected(): void
+    {
+        $files = ['/modules/One/Config/services.json', '/modules/Two/Config/services.json'];
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+        $this->configFilesProvider->expects($this->once())->method('getConfigurationFiles')->willReturn($files);
+        $this->servicesDefinitionParser->method('parse')->willReturn(['shared' => 'TargetService']);
+
+        $factory = new ContainerFactory($this->cache, $this->objectBuilder, $this->servicesDefinitionParser, $this->configFilesProvider);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Service ID "shared" is defined in both');
+        $factory->getInstance();
     }
 
     public function testValidatesAllConfigurationFilesBeforeRegisteringServices(): void
@@ -328,5 +365,48 @@ class ContainerFactoryTest extends TestCase
             $moduleInfo = $detector->getModuleInfo($moduleName);
             $this->assertTrue($moduleInfo === null || is_object($moduleInfo));
         }
+    }
+}
+
+interface ContainerFactoryMailerInterface
+{
+    public function send(): string;
+}
+
+class ContainerFactoryBaseMailer implements ContainerFactoryMailerInterface
+{
+    public function send(): string
+    {
+        return 'base';
+    }
+}
+
+class ContainerFactoryLoggedMailer implements ContainerFactoryMailerInterface
+{
+    private ContainerFactoryMailerInterface $inner;
+
+    public function __construct(ContainerFactoryMailerInterface $inner)
+    {
+        $this->inner = $inner;
+    }
+
+    public function send(): string
+    {
+        return 'logged:'.$this->inner->send();
+    }
+}
+
+class ContainerFactoryAuditedMailer implements ContainerFactoryMailerInterface
+{
+    private ContainerFactoryMailerInterface $inner;
+
+    public function __construct(ContainerFactoryMailerInterface $inner)
+    {
+        $this->inner = $inner;
+    }
+
+    public function send(): string
+    {
+        return 'audited:'.$this->inner->send();
     }
 }

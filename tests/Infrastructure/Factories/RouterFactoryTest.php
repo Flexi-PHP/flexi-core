@@ -77,6 +77,47 @@ class RouterFactoryTest extends TestCase
         $this->assertSame($secondRoute, $router->getByName('admin.dashboard'));
     }
 
+    public function testRouteOverrideReplacesTheNamedRoute(): void
+    {
+        $original = new Route('account.profile', '/profile', 'OriginalController');
+        $replacement = new Route('account.profile', '/profile', 'ModuleController', 'GET', [], [], 'account.profile');
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturn(['/core/routes.json', '/module/routes.json']);
+        $this->routesParser->method('parse')->willReturnCallback(function (string $file) use ($original, $replacement): array {
+            return $file === '/core/routes.json' ? [$original] : [$replacement];
+        });
+
+        $router = $this->routerFactory->getInstance();
+
+        $this->assertSame($replacement, $router->getByName('account.profile'));
+    }
+
+    public function testDuplicateRouteNamesWithoutOverrideAreRejected(): void
+    {
+        $first = new Route('account.profile', '/profile', 'FirstController');
+        $second = new Route('account.profile', '/profile', 'SecondController');
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturn(['/one/routes.json', '/two/routes.json']);
+        $this->routesParser->method('parse')->willReturnCallback(function (string $file) use ($first, $second): array {
+            return $file === '/one/routes.json' ? [$first] : [$second];
+        });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Route name "account.profile" is defined in both');
+        $this->routerFactory->getInstance();
+    }
+
+    public function testRoutesCanSharePathWhenMethodsDiffer(): void
+    {
+        $get = new Route('item.show', '/items', 'GetController', 'GET');
+        $post = new Route('item.create', '/items', 'PostController', 'POST');
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturn(['/routes.json']);
+        $this->routesParser->method('parse')->willReturn([$get, $post]);
+
+        $router = $this->routerFactory->getInstance();
+
+        $this->assertSame($get, $router->getByName('item.show'));
+        $this->assertSame($post, $router->getByName('item.create'));
+    }
+
     public function testGetInstanceWithNoConfigurationFilesReturnsEmptyRouter(): void
     {
         $this->configFilesProvider

@@ -16,6 +16,7 @@ class Route
     private array $parameters;
     private string $name;
     private array $middlewares;
+    private ?string $overrides;
 
     public function __construct(
         string $name,
@@ -23,7 +24,8 @@ class Route
         string $controller,
         string $method = 'GET',
         array $parameters = [],
-        array $middlewares = []
+        array $middlewares = [],
+        ?string $overrides = null
     ) {
         $this->validateMethod($method);
         $this->name = $name;
@@ -32,6 +34,7 @@ class Route
         $this->method = $method;
         $this->parameters = $parameters;
         $this->middlewares = $middlewares;
+        $this->overrides = $overrides;
     }
 
     public function getController(): string
@@ -99,5 +102,10 @@ class Route
     public function hasMiddlewares(): bool
     {
         return !empty($this->middlewares);
+    }
+
+    public function getOverrides(): ?string
+    {
+        return $this->overrides;
     }
 }

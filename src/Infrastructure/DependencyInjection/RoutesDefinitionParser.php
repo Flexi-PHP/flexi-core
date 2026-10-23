@@ -101,7 +101,8 @@ class RoutesDefinitionParser
                 $defined_route['controller'],
                 $defined_route['method'],
                 $defined_route['parameters'] ?? [],
-                $defined_route['middlewares'] ?? []
+                $defined_route['middlewares'] ?? [],
+                $defined_route['overrides'] ?? null
             );
 
             $routes[] = $route;

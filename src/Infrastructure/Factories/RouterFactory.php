@@ -56,11 +56,72 @@ class RouterFactory
         // Use configuration files provider to discover all route files
         $routeFiles = $this->config_files_provider->getConfigurationFiles(ConfigurationType::routes());
 
+        $routesByName = [];
+        $routeSources = [];
+        $overrides = [];
         foreach ($routeFiles as $file) {
             $routes = $this->routes_parser->parse($file);
             foreach ($routes as $route) {
-                $router->addRoute($route);
+                $name = $route->getName();
+                if ($route->getOverrides() !== null) {
+                    if ($route->getOverrides() !== $name) {
+                        throw new \RuntimeException(sprintf(
+                            'Route override "%s" must keep the overridden route name "%s" (%s).',
+                            $name,
+                            $route->getOverrides(),
+                            $file
+                        ));
+                    }
+                    if (isset($overrides[$name])) {
+                        throw new \RuntimeException(sprintf(
+                            'Route "%s" has multiple overrides in %s and %s.',
+                            $name,
+                            $overrides[$name]['file'],
+                            $file
+                        ));
+                    }
+                    $overrides[$name] = ['route' => $route, 'file' => $file];
+                    continue;
+                }
+
+                if (isset($routesByName[$name])) {
+                    throw new \RuntimeException(sprintf(
+                        'Route name "%s" is defined in both %s and %s.',
+                        $name,
+                        $routeSources[$name],
+                        $file
+                    ));
+                }
+                $routesByName[$name] = $route;
+                $routeSources[$name] = $file;
             }
+        }
+
+        foreach ($overrides as $name => $override) {
+            if (!isset($routesByName[$name])) {
+                throw new \RuntimeException(sprintf(
+                    'Route override "%s" in %s does not target an existing route.',
+                    $name,
+                    $override['file']
+                ));
+            }
+            $routesByName[$name] = $override['route'];
+            $routeSources[$name] = $override['file'];
+        }
+
+        $routesByMethodAndPath = [];
+        foreach ($routesByName as $route) {
+            $routeKey = $route->getMethod().' '.$route->getPath();
+            if (isset($routesByMethodAndPath[$routeKey])) {
+                throw new \RuntimeException(sprintf(
+                    'Route %s is defined in both %s and %s.',
+                    $routeKey,
+                    $routeSources[$routesByMethodAndPath[$routeKey]],
+                    $routeSources[$route->getName()]
+                ));
+            }
+            $routesByMethodAndPath[$routeKey] = $route->getName();
+            $router->addRoute($route);
         }
         return $router;
     }

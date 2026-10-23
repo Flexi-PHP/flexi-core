@@ -121,16 +121,16 @@
         },
         {
             "name": "flexi/contracts",
-            "version": "5.1.0",
+            "version": "5.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Flexi-PHP/flexi-contracts.git",
-                "reference": "0b3bec74a52d37fb673b5a421542f27715ece829"
+                "reference": "720a5b47385780bd96615d437f59e74dc09d83e5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Flexi-PHP/flexi-contracts/zipball/0b3bec74a52d37fb673b5a421542f27715ece829",
-                "reference": "0b3bec74a52d37fb673b5a421542f27715ece829",
+                "url": "https://api.github.com/repos/Flexi-PHP/flexi-contracts/zipball/720a5b47385780bd96615d437f59e74dc09d83e5",
+                "reference": "720a5b47385780bd96615d437f59e74dc09d83e5",
                 "shasum": ""
             },
             "require": {
@@ -161,9 +161,9 @@
             "description": "Contracts and PSR dependencies for Flexi Framework - Central interface package",
             "support": {
                 "issues": "https://github.com/Flexi-PHP/flexi-contracts/issues",
-                "source": "https://github.com/Flexi-PHP/flexi-contracts/tree/v5.1.0"
+                "source": "https://github.com/Flexi-PHP/flexi-contracts/tree/v5.2.0"
             },
-            "time": "2026-10-23T19:47:38+00:00"
+            "time": "2026-10-23T20:17:46+00:00"
         },
         {
             "name": "graham-campbell/result-type",

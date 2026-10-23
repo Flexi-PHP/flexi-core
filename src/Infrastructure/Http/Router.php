@@ -56,8 +56,19 @@ class Router
      */
     public function addRoute(Route $route): self
     {
+        if ($this->routes_indexed_by_name->offsetExists($route->getName())) {
+            throw new \RuntimeException(sprintf('Route name "%s" is already registered.', $route->getName()));
+        }
+        $pathKey = $this->getPathKey($route->getPath(), $route->getMethod());
+        if ($this->routes_indexed_by_path->offsetExists($pathKey)) {
+            throw new \RuntimeException(sprintf(
+                'Route %s %s is already registered.',
+                $route->getMethod(),
+                $route->getPath()
+            ));
+        }
         $this->routes_indexed_by_name->add($route, $route->getName());
-        $this->routes_indexed_by_path->add($route, $route->getPath());
+        $this->routes_indexed_by_path->add($route, $pathKey);
 
         return $this;
     }
@@ -76,13 +87,34 @@ class Router
         $this->event_bus->dispatch($event);
         $this->assertThatRouteCollectionIsNotEmpty();
 
-        if (!$this->routes_indexed_by_path->offsetExists($request_path)) {
+        $requestMethod = $request->getMethod();
+        $methodKey = $this->getPathKey($request_path, $requestMethod);
+        if (!$this->routes_indexed_by_path->offsetExists($methodKey)) {
+            if ($this->hasPath($request_path)) {
+                throw new \RuntimeException(sprintf('Method %s is not allowed for this route', $requestMethod));
+            }
             return $this->handleNotFound($request, $request_path);
         }
         /** @var Route $route */
-        $route = $this->routes_indexed_by_path->get($request_path);
+        $route = $this->routes_indexed_by_path->get($methodKey);
 
-        return $this->processRequest($request, $route);
+        return $this->processRequest($request, $route, $requestMethod);
+    }
+
+    private function getPathKey(string $path, string $method): string
+    {
+        return $method.' '.$path;
+    }
+
+    private function hasPath(string $path): bool
+    {
+        foreach ($this->routes_indexed_by_path as $route) {
+            if ($route->getPath() === $path) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function assertThatRouteCollectionIsNotEmpty(): void
@@ -141,9 +173,10 @@ class Router
      */
     public function processRequest(
         ServerRequestInterface $request,
-        Route $route
+        Route $route,
+        ?string $requestMethod = null
     ): ResponseInterface {
-        $this->assertMethodIsAllowedForRoute($request, $route);
+        $this->assertMethodIsAllowedForRoute($request, $route, $requestMethod);
         $this->checkRequiredParamsWereSend($route);
 
         $response = $this->executeStack($route, $request);
@@ -156,10 +189,12 @@ class Router
 
     protected function assertMethodIsAllowedForRoute(
         ServerRequestInterface $request,
-        Route $route
+        Route $route,
+        ?string $requestMethod = null
     ): void {
-        if ($request->getMethod() !== $route->getMethod()) {
-            throw new \RuntimeException("Method {$request->getMethod()} is not allowed for this route");
+        $requestMethod = $requestMethod ?? $request->getMethod();
+        if ($requestMethod !== $route->getMethod()) {
+            throw new \RuntimeException("Method {$requestMethod} is not allowed for this route");
         }
     }
 

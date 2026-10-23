@@ -92,6 +92,13 @@ class ServicesDefinitionParser
         $services = [];
 
         foreach ($definitions['services'] as $service) {
+            if (array_key_exists($service['name'], $services)) {
+                throw new \RuntimeException(sprintf(
+                    'Service ID "%s" is defined more than once in %s.',
+                    $service['name'],
+                    $filename
+                ));
+            }
             if (isset($service['alias'])) {
                 $services[$service['name']] = $service['alias'];
             } elseif (isset($service['factory']) || isset($service['class'])) {

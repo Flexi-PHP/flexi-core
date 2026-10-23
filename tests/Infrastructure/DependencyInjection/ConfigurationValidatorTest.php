@@ -55,6 +55,29 @@ final class ConfigurationValidatorTest extends TestCase
         }
     }
 
+    public function testValidatesServiceDecorationAndRouteOverrideMetadata(): void
+    {
+        $services = $this->writeConfiguration('services.json', json_encode([
+            'services' => [[
+                'name' => 'Auth\\LoggedMailer',
+                'decorates' => 'App\\MailerInterface',
+                'class' => ['name' => 'Auth\\LoggedMailer', 'arguments' => ['@.inner']],
+            ]],
+        ]));
+        $routes = $this->writeConfiguration('routes.json', json_encode([
+            'routes' => [[
+                'name' => 'account.profile',
+                'overrides' => 'account.profile',
+                'path' => '/account/profile',
+                'method' => 'GET',
+                'controller' => 'Auth\\ProfileController',
+            ]],
+        ]));
+
+        $this->assertNull($this->validator->validateFile('services', $services));
+        $this->assertNull($this->validator->validateFile('routes', $routes));
+    }
+
     public function testReportsModuleFileAndInvalidField(): void
     {
         $file = $this->writeConfiguration('routes.json', json_encode([

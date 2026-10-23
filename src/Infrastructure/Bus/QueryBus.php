@@ -42,6 +42,12 @@ class QueryBus implements BusInterface
         string $handler,
         ?string $cli_alias = null
     ): void {
+        if (isset($this->queries[$identifier]) || isset($this->aliases[$identifier])) {
+            throw new \InvalidArgumentException(sprintf('Handler ID "%s" is already registered.', $identifier));
+        }
+        if ($cli_alias !== null && ($cli_alias === $identifier || isset($this->queries[$cli_alias]) || isset($this->aliases[$cli_alias]))) {
+            throw new \InvalidArgumentException(sprintf('Handler alias "%s" is already registered or conflicts with a handler ID.', $cli_alias));
+        }
         $this->queries[$identifier] = $handler;
         if ($cli_alias !== null) {
             $this->registerCliAlias($cli_alias, $handler);
@@ -50,6 +56,9 @@ class QueryBus implements BusInterface
 
     public function registerCliAlias(string $alias, string $handler): void
     {
+        if (isset($this->aliases[$alias]) || isset($this->queries[$alias])) {
+            throw new \InvalidArgumentException(sprintf('Handler alias "%s" is already registered or conflicts with a handler ID.', $alias));
+        }
         $this->aliases[$alias] = $handler;
     }
 
