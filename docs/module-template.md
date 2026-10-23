@@ -140,7 +140,28 @@ When the application has a meaningful event to handle, add an entry such as:
 ]
 ```
 
-The listener implements `Flexi\Contracts\Interfaces\EventListenerInterface` and its `handle(EventInterface $event): void` method. Multiple listeners for an event run in stable registration order. Avoid constructor side effects; handlers and listeners are resolved when used, not preflighted at application startup.
+`src/AccountCreatedListener.php`:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace Acme\Flexi\Example;
+
+use Flexi\Contracts\Interfaces\EventInterface;
+use Flexi\Contracts\Interfaces\EventListenerInterface;
+
+final class AccountCreatedListener implements EventListenerInterface
+{
+    public function handle(EventInterface $event): void
+    {
+        $event->set('example.listener_processed', true);
+    }
+}
+```
+
+The event producer can inspect the updated event after dispatch. Multiple listeners for an event run in stable registration order. Avoid constructor side effects; handlers and listeners are resolved when used, not preflighted at application startup.
 
 ## Validate and activate
 
