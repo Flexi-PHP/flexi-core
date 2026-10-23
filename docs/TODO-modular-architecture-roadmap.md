@@ -8,11 +8,11 @@ This document turns the integration guidelines for services, routes, listeners, 
 - [x] Record the initial result: `docker-compose ps` showed no active containers on 2026-10-23.
 - [x] Confirm with Podman that the `flexi` container is active and use it as the validation environment; the container exposes `8080 -> 80`.
 - [x] Inventory the public module repositories and the versions/namespaces of `flexi-contracts` before changing contracts.
-- [x] Record the host limitation (no PHP) and the available environment: PHP 7.4.33 + PHPUnit 9.6.29 inside the Podman container.
+- [x] Record the available environment: PHP 7.4.33, Composer 2.8.12, and PHPUnit 9.6.33 inside the Podman container in [`runtime-requirements.md`](runtime-requirements.md).
 - [x] Run the full PHPUnit suite after the initial changes: 655 tests, 1,860 assertions, all passing.
 - [x] Perform an initial HTTP check: Apache responds in the container, but `GET /` returns 500 `Define at least one route`; the core route configuration is empty and the only local module is inactive.
 - [ ] Repeat the HTTP smoke test once a reference route exists and is active.
-- [ ] Inventory the required PHP, Composer, extension, and service versions needed to run the project and its tests.
+- [x] Inventory the declared PHP/extension requirements, locked transitive platform requirements, observed Composer/PHPUnit versions, and default external services in [`runtime-requirements.md`](runtime-requirements.md).
 
 ### Initial compatibility findings
 
@@ -106,7 +106,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 ## Block 5 — Listeners, commands, and queries
 
-- [ ] Define registration contracts for listeners, commands, and queries, including the ID and handler class.
+- [x] Define registration contracts for listeners, commands, and queries, including the ID and handler class in [`message-handlers.md`](message-handlers.md) and the Contracts schemas.
 - [x] Establish listener ordering and tie-break rules: equal priority, then stable configuration/definition/listener registration order; specific event listeners precede wildcard listeners.
 - [x] Define handler cardinality: one command/query handler per ID, with unique aliases; multiple event listeners per event are allowed. Collisions fail with source files.
 - [ ] Verify that each listener/handler is instantiable by the container and compatible with its contract before accepting traffic/work. Eager construction is deferred pending agreement about constructor side effects.
@@ -118,21 +118,21 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 ## Block 6 — Security, operations, and performance
 
 - [x] Review required PHP extensions; make `ext-pcntl` optional and document that it is required only for explicitly enabled CLI async dispatch in [`runtime-requirements.md`](runtime-requirements.md).
-- [ ] Document the trust model: a Composer package executes PHP code and functional deactivation is not security isolation.
-- [ ] Separate configuration by environment and secrets; avoid unsafe example values that could be confused with production secrets.
-- [ ] Define permissions and write limits for caches, module state, and logs.
+- [x] Document the trust model: a Composer package executes PHP code and functional deactivation is not security isolation in [`security-and-environment.md`](security-and-environment.md).
+- [x] Separate configuration by environment and secrets; label example values as development-only and document process environment secret injection in [`security-and-environment.md`](security-and-environment.md).
+- [x] Define minimum runtime ownership/access guidance for caches, module state, and logs in [`security-and-environment.md`](security-and-environment.md); application-specific size/retention quotas remain deployment settings until adapter/workload policy is chosen.
 - [ ] Establish a production mode with validated and cached configuration plus explicit invalidation/rebuild during deployment.
 - [ ] Measure bootstrap and HTTP dispatch times with a minimal app and with modules; optimize only with reproducible measurements.
-- [ ] Verify that async mode and process usage are only available in compatible environments and are not accidental requirements for a normal web app.
+- [x] Restrict asynchronous dispatch to explicitly enabled CLI use and check process capabilities only when requested; document this optional requirement in [`runtime-requirements.md`](runtime-requirements.md).
 
 **Acceptance:** Flexi starts in the documented minimum environment, fails safely on invalid configuration, and has reproducible measurements to justify performance decisions.
 
 ## Block 7 — Verification and developer guidance
 
-- [ ] Create integration tests for each configuration file and for activation/deactivation behavior.
+- [x] Cover schemas for services, routes, listeners, commands, and queries and activation/deactivation registration rebuilds in `ConfigurationValidatorTest`, parser/factory tests, and module activation tests.
 - [ ] Test HTTP routes and middlewares with the Docker stack, verifying status codes, headers, order, and errors.
 - [ ] Test resolution and collisions of services, listeners, commands, and queries with independent modules.
-- [ ] Test cold/warm cache behavior and manifest/configuration changes to avoid stale results.
+- [x] Test cache hit/miss behavior and Composer lock, module manifest, module membership, and configuration content changes in `ModuleCacheManagerTest`, parser tests, and cache invalidation tests.
 - [ ] Add a minimal module template with a route, service, middleware, and optional listener.
 - [ ] Document atomic recipes: install/activate, add a capability, replace an adapter, deactivate, and remove.
 - [ ] Align README, historical documentation, and examples with the implemented behavior; mark old proposals as deprecated.

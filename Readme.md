@@ -61,8 +61,9 @@ To get started with Flexi Framework, ensure you:
 - Serve static files directly and route all other requests to the `index.php` file in the `public` directory.
 - Set up the `.env` file with the necessary environment variables for your application.
 
-After setup, browse to the URL of your application to see the welcome page. If you use the default configuration
-with Docker, you can access the application at http://localhost:8080.
+After setup, configure and activate a module that provides at least one route before browsing the application. The
+core repository has no default welcome route; with the default Docker configuration, the application is available at
+http://localhost:8080.
 
 ## Module Management
 
