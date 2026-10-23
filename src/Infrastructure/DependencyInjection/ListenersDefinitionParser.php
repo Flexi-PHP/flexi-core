@@ -38,8 +38,9 @@ class ListenersDefinitionParser
         $this->ensureFileExists($filename);
         $this->configurationValidator->validateFile('listeners', $filename);
 
-        if ($this->isFileProcessed($filename)) {
-            return $this->getCachedListeners($filename);
+        $fileCacheKey = $this->getFileCacheKey($filename);
+        if ($this->isFileProcessed($filename) && $this->cache->has($fileCacheKey)) {
+            return $this->cache->get($fileCacheKey, []);
         }
 
         $definitions = $this->readJsonFile($filename);
@@ -68,16 +69,6 @@ class ListenersDefinitionParser
     private function isFileProcessed(string $filename): bool
     {
         return isset($this->filesProcessed[$filename]);
-    }
-
-    /**
-     * Retrieves cached listeners for a processed file.
-     */
-    private function getCachedListeners(string $filename): array
-    {
-        $fileCacheKey = $this->getFileCacheKey($filename);
-
-        return $this->cache->get($fileCacheKey, []);
     }
 
     /**
@@ -124,6 +115,6 @@ class ListenersDefinitionParser
      */
     private function getFileCacheKey(string $filename): string
     {
-        return self::LISTENERS_CACHE_KEY_PREFIX.md5($filename);
+        return self::LISTENERS_CACHE_KEY_PREFIX.md5($filename.hash_file('sha256', $filename));
     }
 }

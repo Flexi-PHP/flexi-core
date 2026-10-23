@@ -41,8 +41,9 @@ class RoutesDefinitionParser
         $this->ensureFileExists($filename);
         $this->configurationValidator->validateFile('routes', $filename);
 
-        if ($this->isFileProcessed($filename)) {
-            return $this->getCachedRoutes($filename);
+        $fileCacheKey = $this->getFileCacheKey($filename);
+        if ($this->isFileProcessed($filename) && $this->cache->has($fileCacheKey)) {
+            return $this->cache->get($fileCacheKey, []);
         }
 
         $definitions = $this->readJsonFile($filename);
@@ -71,18 +72,6 @@ class RoutesDefinitionParser
     private function isFileProcessed(string $filename): bool
     {
         return isset($this->filesProcessed[$filename]);
-    }
-
-    /**
-     * Retrieves cached routes for a processed file.
-     *
-     * @return Route[]
-     */
-    private function getCachedRoutes(string $filename): array
-    {
-        $fileCacheKey = $this->getFileCacheKey($filename);
-
-        return $this->cache->get($fileCacheKey, []);
     }
 
     /**
@@ -135,6 +124,6 @@ class RoutesDefinitionParser
      */
     private function getFileCacheKey(string $filename): string
     {
-        return self::ROUTES_CACHE_KEY_PREFIX.md5($filename);
+        return self::ROUTES_CACHE_KEY_PREFIX.md5($filename.hash_file('sha256', $filename));
     }
 }

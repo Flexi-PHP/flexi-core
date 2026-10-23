@@ -68,7 +68,7 @@ final class ServicesDefinitionParserTest extends TestCase
             'factory' => ['class' => 'CacheFactory', 'method' => 'create'],
         ], $services['cache']);
 
-        $cacheKey = 'services_file.' . md5($file);
+        $cacheKey = 'services_file.' . md5($file.hash_file('sha256', $file));
         $this->assertArrayHasKey($cacheKey, $cache->store);
         $cachedServices = $cache->store[$cacheKey];
         $this->assertCount(3, $cachedServices);
@@ -90,14 +90,32 @@ final class ServicesDefinitionParserTest extends TestCase
         $cachedServices = [
             'cached_service' => ['name' => 'cached', 'class' => ['name' => 'CachedClass']]
         ];
-        $cache->store['services_file.' . md5($file)] = $cachedServices;
+        $cacheKey = 'services_file.' . md5($file.hash_file('sha256', $file));
+        $cache->store[$cacheKey] = $cachedServices;
 
         $parser = new ServicesDefinitionParser($cache);
 
         $result = $parser->parse($file);
 
         $this->assertSame($cachedServices, $result);
-        $this->assertSame(0, $cache->setCalls['services_file.' . md5($file)] ?? 0);
+        $this->assertSame(0, $cache->setCalls[$cacheKey] ?? 0);
+    }
+
+    public function testParseInvalidatesCachedServicesWhenFileContentsChange(): void
+    {
+        $file = $this->tempDir . '/changing_services.json';
+        file_put_contents($file, json_encode([
+            'services' => [['name' => 'mailer', 'class' => ['name' => 'App\\Mail\\FirstMailer']]],
+        ]));
+
+        $parser = new ServicesDefinitionParser(new ServicesArrayCache());
+        $this->assertSame('App\\Mail\\FirstMailer', $parser->parse($file)['mailer']['class']['name']);
+
+        file_put_contents($file, json_encode([
+            'services' => [['name' => 'mailer', 'class' => ['name' => 'App\\Mail\\SecondMailer']]],
+        ]));
+
+        $this->assertSame('App\\Mail\\SecondMailer', $parser->parse($file)['mailer']['class']['name']);
     }
 
     public function testParseThrowsWhenFileDoesNotExist(): void

@@ -61,7 +61,7 @@ final class RoutesDefinitionParserTest extends TestCase
         $this->assertSame('/dashboard', $routes[0]->getPath());
         $this->assertSame(['auth'], $routes[0]->getMiddlewares());
 
-        $cacheKey = 'routes_file.' . md5($file);
+        $cacheKey = 'routes_file.' . md5($file.hash_file('sha256', $file));
         $this->assertArrayHasKey($cacheKey, $cache->store);
         $cachedRoutes = $cache->store[$cacheKey];
         $this->assertCount(2, $cachedRoutes);
@@ -82,14 +82,15 @@ final class RoutesDefinitionParserTest extends TestCase
         ]);
 
         $cachedRoutes = [new Route('cached', '/cached', 'Handler', 'GET')];
-        $cache->store['routes_file.' . md5($file)] = $cachedRoutes;
+        $cacheKey = 'routes_file.' . md5($file.hash_file('sha256', $file));
+        $cache->store[$cacheKey] = $cachedRoutes;
 
         $parser = new RoutesDefinitionParser($cache);
 
         $result = $parser->parse($file);
 
         $this->assertSame($cachedRoutes, $result);
-        $this->assertSame(0, $cache->setCalls['routes_file.' . md5($file)] ?? 0);
+        $this->assertSame(0, $cache->setCalls[$cacheKey] ?? 0);
     }
 
     public function testParseThrowsWhenFileDoesNotExist(): void

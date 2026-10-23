@@ -53,7 +53,7 @@ final class ListenersDefinitionParserTest extends TestCase
         $this->assertSame('Modules\\Order\\Listeners\\ProcessPayment', $listeners[1]['handler']);
         $this->assertSame(0, $listeners[1]['priority']);
 
-        $cacheKey = 'listeners_file.' . md5($file);
+        $cacheKey = 'listeners_file.' . md5($file.hash_file('sha256', $file));
         $this->assertArrayHasKey($cacheKey, $cache->store);
         $cachedListeners = $cache->store[$cacheKey];
         $this->assertCount(2, $cachedListeners);
@@ -75,14 +75,15 @@ final class ListenersDefinitionParserTest extends TestCase
         $cachedListeners = [
             ['event' => 'CachedEvent', 'handler' => 'CachedHandler', 'priority' => 5]
         ];
-        $cache->store['listeners_file.' . md5($file)] = $cachedListeners;
+        $cacheKey = 'listeners_file.' . md5($file.hash_file('sha256', $file));
+        $cache->store[$cacheKey] = $cachedListeners;
 
         $parser = new ListenersDefinitionParser($cache);
 
         $result = $parser->parse($file);
 
         $this->assertSame($cachedListeners, $result);
-        $this->assertSame(0, $cache->setCalls['listeners_file.' . md5($file)] ?? 0);
+        $this->assertSame(0, $cache->setCalls[$cacheKey] ?? 0);
     }
 
     public function testParseThrowsWhenFileDoesNotExist(): void

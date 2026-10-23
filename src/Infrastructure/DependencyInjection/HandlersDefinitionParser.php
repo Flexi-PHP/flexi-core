@@ -40,8 +40,9 @@ class HandlersDefinitionParser
         $type = $configurationType ? $configurationType->value() : basename($filename, '.json');
         $this->configurationValidator->validateFile($type, $filename);
 
-        if ($this->isFileProcessed($filename)) {
-            return $this->getCachedHandlers($filename);
+        $fileCacheKey = $this->getFileCacheKey($filename);
+        if ($this->isFileProcessed($filename) && $this->cache->has($fileCacheKey)) {
+            return $this->cache->get($fileCacheKey, []);
         }
 
         $definitions = $this->readJsonFile($filename);
@@ -70,16 +71,6 @@ class HandlersDefinitionParser
     private function isFileProcessed(string $filename): bool
     {
         return isset($this->filesProcessed[$filename]);
-    }
-
-    /**
-     * Retrieves cached handlers for a processed file.
-     */
-    private function getCachedHandlers(string $filename): array
-    {
-        $fileCacheKey = $this->getFileCacheKey($filename);
-
-        return $this->cache->get($fileCacheKey, []);
     }
 
     /**
@@ -126,6 +117,6 @@ class HandlersDefinitionParser
      */
     private function getFileCacheKey(string $filename): string
     {
-        return self::HANDLERS_CACHE_KEY_PREFIX.md5($filename);
+        return self::HANDLERS_CACHE_KEY_PREFIX.md5($filename.hash_file('sha256', $filename));
     }
 }
