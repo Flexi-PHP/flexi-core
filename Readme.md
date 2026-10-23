@@ -24,30 +24,32 @@ leverages Dependency Injection (DI), a flexible routing system, CQRS and an even
 ## Features
 
 - **Modularity & Extensibility**: Flexi offers a modular architecture that promotes code organization and reusability. Its extensibility allows developers to customize and extend functionality according to specific project requirements. Each module is a self-contained Composer package with its own dependencies, allowing for easy installation, uninstallation, and version management.
-- **Automatic Module Discovery**: Modules are automatically discovered and registered. Simply create a module in the `modules/` directory with a `composer.json` file, run `composer modules:sync`, and it's ready to use.
+- **Modular Architecture**: Flexi discovers local and Composer-installed modules. A module declares its configuration files in its Composer `extra.flexi` manifest and must be activated before its components are registered.
 - **Dependency Injection**: Built-in support for Dependency Injection simplifies management and injection of dependencies, enhancing code maintainability and testability. DI in Flexi is implemented using a container that manages service with lazy loading instantiation.
 - **Flexible Routing**: With a flexible routing system, developers can easily define and manage HTTP request handling, streamlining development of complex routing logic enriched with middleware support.
-- **Event-Driven Architecture**: Flexi's event-driven architecture enables asynchronous handling of events by event listeners, fostering loose coupling and flexibility in application design.
-- **CQRS & Scalability**: Support for Command Query Responsibility Segregation (CQRS) promotes scalability and performance optimization. Combined with features like asynchronous processing, Flexi facilitates the development of scalable applications capable of handling high traffic and data loads.
-- **Configuration via JSON**: Configuration in Flexi is managed through JSON files, making it easy to define services, routes, events, queries, and commands. This approach simplifies configuration management and promotes consistency across projects. Json Schema will be implemented to validate the configuration files.
+- **Event-Driven Architecture**: Flexi dispatches events to registered listeners, helping keep event producers separate from application reactions.
+- **CQRS**: Separate command and query buses let applications organize request handling around explicit command and query handlers.
+- **Validated JSON Configuration**: Services, routes, listeners, commands, and queries use JSON configuration validated against the schemas shipped by [`flexi/contracts`](https://github.com/Flexi-PHP/flexi-contracts/tree/v5.2.0/schemas/configuration/v1). That package is the single source of truth for the core and modules.
 
 ## Structure
 
 - **Core**: the `src/` directory contains the core classes and interfaces that make up the framework.
-- **Contracts**: the `contracts/` directory contains shared interfaces and base classes used by both core and modules, ensuring loose coupling and standardization.
+- **Contracts**: shared interfaces and configuration schemas are provided by the Composer dependency `flexi/contracts`; this repository does not maintain a separate `contracts/` directory.
 - **Modules**: the `modules/` directory contains all pieces of code that are not part of the core framework. Each module is a self-contained Composer package with its own `composer.json`, dependencies, controllers, services, and configuration files. Modules are plug-and-play and can be easily installed, uninstalled, or versioned independently.
 - **Config**: the `src/Config/` and `modules/*/Config` directories contain configuration files for the framework (`routes`, `commands`, `queries`, `event listeners` and `services`).
 - **Console**: the `bin/` directory contains the console application for CLI commands.
 
 ## Installation
 
-You can install Flexi Framework using Composer:
+The Flexi core repository is a Composer project. Clone the repository and install its dependencies:
 
 ```bash
-composer create-project cubadevops/flexi my-app
+git clone https://github.com/Flexi-PHP/flexi-core.git my-app
+cd my-app
+composer install
 ```
 
-This command creates a minimal ready boilerplate application in the `my-app` directory.
+This sets up the core project. Flexi does not currently provide a separate application scaffolding command.
 
 __Steps after install__
 
@@ -63,71 +65,31 @@ with Docker, you can access the application at http://localhost:8080.
 
 ## Module Management
 
-Flexi features an automatic module discovery system that makes managing modules simple and efficient.
+Modules are discovered from the local `modules/` directory and Composer's installed packages. Each module declares its identity and configuration files in `extra.flexi` in its `composer.json`; only active modules contribute registrations. See [the module manifest](docs/module-manifest.md) and [module lifecycle](docs/module-lifecycle.md) for the current format and behavior.
 
-### Available Commands
+For example, a module can declare its routes and services like this:
 
-```bash
-# Sync all modules (auto-discover and register)
-composer modules:sync
-
-# List all available modules
-composer modules:list
-
-# Get detailed information about a module
-php bin/console modules:info Auth
-
-# Validate module configuration
-composer modules:validate
-
-# Install a module
-php bin/console modules:install ModuleName
-
-# Uninstall a module
-php bin/console modules:uninstall ModuleName
-```
-
-### Creating a New Module
-
-```bash
-# 1. Create module structure
-mkdir -p modules/MyModule/{Domain,Infrastructure,Config}
-
-# 2. Create composer.json
-cat > modules/MyModule/composer.json << 'EOF'
+```json
 {
-  "name": "cubadevops/flexi-module-mymodule",
-  "version": "1.0.0",
+  "name": "acme/flexi-module-account",
   "type": "flexi-module",
-  "require": {
-    "php": ">=7.4",
-    "cubadevops/flexi-contracts": "@dev"
-  },
-  "autoload": {
-    "psr-4": {
-      "Flexi\\Modules\\MyModule\\": ""
+  "require": {"php": ">=7.4", "flexi/contracts": "^5.0"},
+  "autoload": {"psr-4": {"Acme\\Account\\": "src/"}},
+  "extra": {
+    "flexi": {
+      "schema-version": 1,
+      "module-name": "Account",
+      "compatibility": {"core": "^3.0"},
+      "config-files": ["Config/services.json", "Config/routes.json"],
+      "provides": ["account.profile"]
     }
   }
 }
-EOF
-
-# 3. Sync modules
-composer modules:sync
 ```
 
-That's it! Your module is now installed and ready to use. Changes to module code are immediately reflected thanks to symlinks.
+### Available Commands
 
-### How It Works
-
-1. Each module has its own `composer.json` defining its package name and dependencies
-2. The `modules:sync` command scans the `modules/` directory and auto-discovers modules
-3. Composer creates symlinks from `vendor/cubadevops/flexi-module-*` to `modules/*`
-4. All dependencies are managed centrally by Composer
-5. Modules can be versioned, published to Git repositories, and shared across projects
-
-For detailed documentation, see:
-- [Automatic Module System](docs/modular-system-automatic.md)
-- [Modules README](modules/README.md)
+The available module console commands are defined in [`src/Config/commands.json`](src/Config/commands.json). Install package dependencies with Composer, then use the registered `modules:list`, `modules:status`, `modules:activate`, `modules:deactivate`, `modules:info`, `modules:validate`, and `modules:env-update` commands as appropriate. The module lifecycle documentation describes which behaviors are implemented and which remain roadmap items.
 
 ## Configuration
 
@@ -136,8 +98,7 @@ commands used within your application.
 
 ### Services
 
-Services are defined in the `services.json` file located in the `Config` directory. This file outlines how each service
-should be instantiated, either directly or via factory methods.
+Services are defined in `services.json`. Module configuration files are selected by the core from the module manifest; file discovery does not use `glob` entries inside JSON.
 
 #### Example
 
@@ -145,28 +106,12 @@ should be instantiated, either directly or via factory methods.
 {
   "services": [
     {
-      "name": "Flexi\\Infrastructure\\Classes\\Configuration",
-      "factory": {
-        "class": "Flexi\\Infrastructure\\Factories\\ConfigurationFactory",
-        "method": "getInstance",
-        "arguments": []
-      }
+      "name": "App\\Infrastructure\\Mailer",
+      "class": {"name": "App\\Infrastructure\\SmtpMailer", "arguments": ["ENV.MAILER_DSN"]}
     },
     {
-      "name": "session",
-      "alias": "Flexi\\Infrastructure\\Session\\NativeSessionStorage"
-    },
-    {
-      "name": "logger",
-      "class": {
-        "name": "Flexi\\Contracts\\Classes\\PsrLogger",
-        "arguments": [
-          "@Flexi\\Infrastructure\\Persistence\\InFileLogRepository"
-        ]
-      }
-    },
-    {
-      "glob": "/modules/*/Config/services.json"
+      "name": "mailer",
+      "alias": "App\\Infrastructure\\Mailer"
     }
   ]
 }
@@ -174,12 +119,12 @@ should be instantiated, either directly or via factory methods.
 
 __Note:__
 
-- The `alias` key is used to reference services by a different name.
+- Each service has a unique `name`; an `alias` definition maps a service ID to another service ID.
 - Arguments prefixed with `@` are references to other services (can be alias as well)
 - Arguments prefixed with `ENV.` are references to environment variables.
 - Quoted strings without `@` or `ENV.` prefixes are treated as string values.
 - All other values are treated as the standard json_decode values.
-- The `glob` key is used to include services from `modules`.
+- Modules list configuration paths in `extra.flexi.config-files`; the core loads files from active modules.
 
 #### Service decoration
 
@@ -204,8 +149,7 @@ The decorated target continues to be resolved through its original ID. The `@.in
 
 ### Routes
 
-Routes are defined in the `routes.json` file. Each route specifies the HTTP method, path, and the controller that should
-handle the request.
+Routes are defined in `routes.json`. Each route specifies a name, path, HTTP method, and controller. Module route files are listed in the module manifest.
 
 #### Example
 
@@ -216,20 +160,16 @@ handle the request.
       "name": "health",
       "path": "/health",
       "method": "GET",
-      "controller": "Flexi\\Infrastructure\\Controllers\\HealthController",
+      "controller": "App\\Http\\HealthController",
       "parameters": [],
-      "middlewares": [
-        "Flexi\\Infrastructure\\Middlewares\\AuthCheckMiddleware"
-      ]
+      "middlewares": ["App\\Http\\Middleware\\AuthMiddleware"]
     },
     {
-      "name": "404",
-      "path": "/not-found",
+      "name": "account.profile",
+      "path": "/account/profile",
       "method": "GET",
-      "controller": "Flexi\\Infrastructure\\Controllers\\NotFoundController"
-    },
-    {
-      "glob": "/modules/*/Config/routes.json"
+      "controller": "App\\Http\\ProfileController",
+      "parameters": [{"name": "locale", "required": true}]
     }
   ]
 }
@@ -237,10 +177,10 @@ handle the request.
 
 __Note:__
 
-- Controllers should implement the `Psr\Http\Server\RequestHandlerInterface` interface if you want attach middlewares. However they must have a `handle` method that receives a `Psr\Http\Message\ServerRequestInterface` and returns a `Psr\Http\Message\ResponseInterface`.
-- The optional `parameters` key is used to define how many params should be passed to the request and if they are required.
+- Controllers must implement `Psr\Http\Server\RequestHandlerInterface`. Route middleware is applied by the router when the controller extends `Flexi\Contracts\Classes\HttpHandler`.
+- The optional `parameters` key declares required query or form parameters; it does not define path placeholders.
 - The optional `middlewares` key is used to define the middlewares that should be executed before the controller. They are executed in the order they are defined and can stop the execution chain if they return a response directly or pass the request to the next middleware.
-- The `glob` key is used to include additional route definitions from `modules`.
+- Modules list route configuration files in `extra.flexi.config-files`; the core loads files from active modules.
 
 Routes with duplicate names or `METHOD path` pairs fail at startup. A module can intentionally replace a route by setting `overrides` to the existing route name; the replacement must keep that same name. Routes sharing a path with different HTTP methods are supported.
 
@@ -267,13 +207,12 @@ Events and listeners are defined in the `listeners.json` file. This file maps ev
 ```json
 [
   {
-    "event": "*",
-    "listeners": [
-      "Flexi\\Application\\EventListeners\\LoggerEventListener"
-    ]
+    "event": "App\\Order\\OrderPlaced",
+    "listeners": ["App\\Order\\SendConfirmationEmail"]
   },
   {
-    "glob": "/modules/*/Config/listeners.json"
+    "event": "*",
+    "listeners": ["App\\Observability\\LogEvents"]
   }
 ]
 ```
@@ -282,6 +221,7 @@ __Note:__
 
 - The `event` key can be a specific event name or a wildcard `*` to listen to all events.
 - The listener class should implement `Flexi\Contracts\Interfaces\EventListenerInterface` or extend the `Flexi\Contracts\Classes\EventListener` base class. Its `handle()` method receives an `EventInterface` and returns `void`.
+- Module listener files are declared in `extra.flexi.config-files`; do not add glob objects to listener JSON files.
 
 ### Queries
 
@@ -294,12 +234,9 @@ alias.
 {
   "handlers": [
     {
-      "id": "Flexi\\Domain\\DTO\\EmptyVersionDTO",
-      "cli_alias": "version",
-      "handler": "Flexi\\Application\\UseCase\\Health"
-    },
-    {
-      "glob": "/modules/*/Config/queries.json"
+      "id": "App\\Catalog\\GetProductQuery",
+      "cli_alias": "catalog:product",
+      "handler": "App\\Catalog\\GetProductHandler"
     }
   ]
 }
@@ -307,7 +244,7 @@ alias.
 
 __Note:__
 
-- Handlers should implement the `Flexi\Domain\Interfaces\HandlerInterface` interface.
+- Handlers implement `Flexi\Contracts\Interfaces\HandlerInterface`; the query identifier is the DTO class name. Module query files are declared in `extra.flexi.config-files`.
 
 ### Commands
 
@@ -319,7 +256,9 @@ Commands are defined similarly to queries in the `commands.json` file.
 {
   "handlers": [
     {
-      "glob": "/modules/*/Config/commands.json"
+      "id": "App\\Order\\PlaceOrderCommand",
+      "cli_alias": "orders:place",
+      "handler": "App\\Order\\PlaceOrderHandler"
     }
   ]
 }
@@ -327,7 +266,7 @@ Commands are defined similarly to queries in the `commands.json` file.
 
 __Note:__
 
-- Handlers should implement the `Flexi\Domain\Interfaces\HandlerInterface` interface.
+- Handlers implement `Flexi\Contracts\Interfaces\HandlerInterface`; the command identifier is the DTO class name. Module command files are declared in `extra.flexi.config-files`.
 
 ## Usage
 
@@ -338,14 +277,14 @@ The `Router` class is responsible for managing routes and dispatching requests t
 #### Example Usage
 
 ```php
-use Flexi\Domain\Classes\Router;
-use Psr\Http\Message\ServerRequestInterface;
-use Flexi\Infrastructure\Factories\ContainerFactory;
+use Flexi\Infrastructure\Http\Router;
 
-/** @var Router $router */
-$router = ContainerFactory::getInstance()->get(Router::class); // or use router alias
-$route = $router->getByName('home'); // Get a route by name
-$route->getPath(); // Get the path of the route to pass to the template
+function getHomePath(Router $router): string
+{
+    $route = $router->getByName('home');
+
+    return $route->getPath();
+}
 ```
 
 ### Event System
@@ -356,15 +295,14 @@ accordingly.
 #### Example
 
 ```php
-use Flexi\Domain\Interfaces\EventBusInterface;
-use Flexi\Domain\Classes\Event;
-use Flexi\Application\UseCase\Health;
-use Flexi\Infrastructure\Factories\ContainerFactory;
-use Flexi\Infrastructure\Bus\EventBus;
+use Flexi\Contracts\Interfaces\EventBusInterface;
+use Flexi\Domain\Events\Event;
 
-$eventBus = ContainerFactory::getInstance()->get(EventBus::class);
-$event = new Event('health-check', Health::class, ['from' => $_SERVER['REMOTE_ADDR']);
-$eventBus->notify($event);
+function dispatchHealthCheck(EventBusInterface $eventBus): void
+{
+    $event = new Event('health-check', 'health-check endpoint', ['from' => $_SERVER['REMOTE_ADDR'] ?? 'unknown']);
+    $eventBus->dispatch($event);
+}
 ```
 
 ### CQRS
@@ -391,7 +329,7 @@ $result = $queryBus->execute($query);
 
 ### Controllers and Response
 
-The response is a PSR-7 response object that can be returned from a controller or middleware. Controllers that extend the `Flexi\Infrastructure\Classes\HttpHandler` have an easy way to build responses using the `createResponse` method. If you don't extend the `HttpHandler` you can use a factory that implements `Psr\Http\Message\ResponseFactoryInterface` interface to build the response. Flexi uses the `GuzzleHttp\Psr7\HttpFactory` as default factory.
+The response is a PSR-7 response object that can be returned from a controller or middleware. Controllers that extend `Flexi\Contracts\Classes\HttpHandler` can build responses with `createResponse()`. Its constructor requires a `Psr\Http\Message\ResponseFactoryInterface`, supplied by the container. Flexi uses `GuzzleHttp\Psr7\HttpFactory` as the default factory.
 
 The `HttpHandler` abstract class implements a Template Method pattern that automatically manages the middleware chain execution. Controllers only need to implement the `process()` method with their specific business logic, while the framework handles middleware orchestration automatically.
 
@@ -400,89 +338,23 @@ The `HttpHandler` abstract class implements a Template Method pattern that autom
 ```php
 namespace Flexi\Modules\Home\Infrastructure\Controllers;
 
-use Flexi\Infrastructure\Classes\HttpHandler;
+use Flexi\Contracts\Classes\HttpHandler;
+use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 class AuthenticatedController extends HttpHandler
 {
+    public function __construct(ResponseFactoryInterface $responseFactory)
+    {
+        parent::__construct($responseFactory);
+    }
+
     protected function process(ServerRequestInterface $request): ResponseInterface
     {
         // This method is called automatically after all middlewares have been processed
         $response = $this->createResponse();
         $response->getBody()->write('Authorized');
-
-        return $response;
-    }
-}
-```
-
-#### Controller with Dependencies and Business Logic
-
-```php
-namespace Flexi\Infrastructure\Controllers;
-
-use Flexi\Infrastructure\Bus\QueryBus;
-use Flexi\Application\Queries\GetVersionQuery;
-use Flexi\Infrastructure\Classes\HttpHandler;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
-
-class HealthController extends HttpHandler
-{
-    private QueryBus $query_bus;
-
-    public function __construct(QueryBus $query_bus)
-    {
-        $this->query_bus = $query_bus;
-        parent::__construct(); // Always call parent constructor
-    }
-
-    protected function process(ServerRequestInterface $request): ResponseInterface
-    {
-        // Execute business logic using CQRS pattern
-        $version = $this->query_bus->execute(new GetVersionQuery());
-
-        $response = $this->createResponse();
-        $response->getBody()->write('Version: ' . $version);
-
-        return $response;
-    }
-}
-```
-
-#### Controller with Template Rendering
-
-```php
-namespace Flexi\Infrastructure\Controllers;
-
-use Flexi\Domain\Interfaces\TemplateEngineInterface;
-use Flexi\Infrastructure\Classes\HttpHandler;
-use Flexi\Contracts\Classes\Traits\FileHandlerTrait;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
-
-class NotFoundController extends HttpHandler
-{
-    use FileHandlerTrait;
-
-    private TemplateEngineInterface $html_render;
-
-    public function __construct(TemplateEngineInterface $html_render)
-    {
-        $this->html_render = $html_render;
-        parent::__construct();
-    }
-
-    protected function process(ServerRequestInterface $request): ResponseInterface
-    {
-        $body = $this->html_render->render(
-            $this->normalize('./src/Infrastructure/Ui/Templates/404.html'),
-            ['request' => $request->getUri()->getPath()]
-        );
-
-        $response = $this->createResponse(404, 'Not Found');
-        $response->getBody()->write($body);
 
         return $response;
     }
