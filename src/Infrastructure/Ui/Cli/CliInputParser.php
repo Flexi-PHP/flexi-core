@@ -6,7 +6,7 @@ namespace Flexi\Infrastructure\Ui\Cli;
 
 class CliInputParser
 {
-    public const FORMAT = '/(--command|--query|--event|-c|-q|-e) [a-zA-Z0-9]+(\s[a-zA-Z0-9]+=[a-zA-Z0-9]+)*(\s(--help|-h))?/';
+    public const FORMAT = '/^(--command|--query|--event|-c|-q|-e)\s+[a-zA-Z0-9:_-]+(\s+[a-zA-Z0-9_-]+=[^\s]*)*(\s+(--help|-h))?$/D';
 
     public static function parse(array $input): CliInput
     {
