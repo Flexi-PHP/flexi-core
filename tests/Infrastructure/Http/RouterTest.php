@@ -86,11 +86,10 @@ class RouterTest extends TestCase
             ['test' => 'param']
         );
         $uriInterfaceMock = $this->createMock(UriInterface::class);
-        $testHandler = new TestHttpHandler();
+        $testHandler = $this->createMock(\Psr\Http\Server\RequestHandlerInterface::class);
         $serverRequestMock = $this->createMock(ServerRequestInterface::class);
         $responseInterfaceMock = $this->createMock(ResponseInterface::class);
-
-        $testHandler->setMockResponse($responseInterfaceMock);
+        $testHandler->expects($this->once())->method('handle')->with($serverRequestMock)->willReturn($responseInterfaceMock);
 
         $serverRequestMock->expects($this->exactly(2))
             ->method('getUri')->willReturn($uriInterfaceMock);
@@ -323,11 +322,10 @@ class RouterTest extends TestCase
         $this->router->addRoute($routeWithMiddleware);
 
         $uriInterfaceMock = $this->createMock(UriInterface::class);
-        $testHandler = new TestHttpHandler();
+        $testHandler = $this->createMock(\Psr\Http\Server\RequestHandlerInterface::class);
         $serverRequestMock = $this->createMock(ServerRequestInterface::class);
         $responseInterfaceMock = $this->createMock(ResponseInterface::class);
-
-        $testHandler->setMockResponse($responseInterfaceMock);
+        $testHandler->expects($this->once())->method('handle')->with($serverRequestMock)->willReturn($responseInterfaceMock);
 
         $serverRequestMock->expects($this->exactly(2))
             ->method('getUri')->willReturn($uriInterfaceMock);
@@ -341,19 +339,23 @@ class RouterTest extends TestCase
         $this->event_bus->expects($this->exactly(2))
             ->method('dispatch')->willReturnSelf();
 
-        // Handler first, then middlewares
-        $this->class_factory->expects($this->exactly(3))
-            ->method('build')
-            ->withConsecutive(
-                [$this->container, 'MiddlewareController'],
-                [$this->container, 'AuthMiddleware'],
-                [$this->container, 'LoggingMiddleware']
-            )
-            ->willReturnOnConsecutiveCalls(
-                $testHandler,
-                $this->createMock(\Psr\Http\Server\MiddlewareInterface::class),
-                $this->createMock(\Psr\Http\Server\MiddlewareInterface::class)
+        $authMiddleware = $this->createMock(\Psr\Http\Server\MiddlewareInterface::class);
+        $loggingMiddleware = $this->createMock(\Psr\Http\Server\MiddlewareInterface::class);
+        foreach ([$authMiddleware, $loggingMiddleware] as $middleware) {
+            $middleware->expects($this->once())->method('process')->willReturnCallback(
+                static function ($request, $handler) {
+                    return $handler->handle($request);
+                }
             );
+        }
+        $this->container->expects($this->exactly(2))
+            ->method('get')
+            ->withConsecutive(['AuthMiddleware'], ['LoggingMiddleware'])
+            ->willReturnOnConsecutiveCalls($authMiddleware, $loggingMiddleware);
+        $this->class_factory->expects($this->once())
+            ->method('build')
+            ->with($this->container, 'MiddlewareController')
+            ->willReturn($testHandler);
 
         $response = $this->router->dispatch($serverRequestMock);
 
@@ -804,58 +806,6 @@ class RouterTest extends TestCase
         $result = $method->invoke($this->router, $route, $serverRequestMock);
 
         $this->assertSame($responseMock, $result);
-    }
-
-    /**
-     * Tests configureMiddlewares with HttpHandler
-     * @throws ContainerExceptionInterface
-     * @throws NotFoundExceptionInterface
-     * @throws \ReflectionException
-     */
-    public function testConfigureMiddlewaresWithHttpHandler(): void
-    {
-        $route = new Route('test-route', '/test', 'TestController', 'GET', [], ['TestMiddleware']);
-
-        $httpHandlerMock = $this->createMock(\Flexi\Contracts\Classes\HttpHandler::class);
-        $middlewareMock = $this->createMock(\Psr\Http\Server\MiddlewareInterface::class);
-
-        $this->class_factory->expects($this->once())
-            ->method('build')
-            ->with($this->container, 'TestMiddleware')
-            ->willReturn($middlewareMock);
-
-        $httpHandlerMock->expects($this->once())
-            ->method('setMiddlewares')
-            ->with([$middlewareMock]);
-
-        $reflection = new \ReflectionClass($this->router);
-        $method = $reflection->getMethod('configureMiddlewares');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->router, $httpHandlerMock, $route);
-
-        $this->assertSame($httpHandlerMock, $result);
-    }
-
-    /**
-     * Tests configureMiddlewares with non-HttpHandler
-     * @throws \ReflectionException
-     */
-    public function testConfigureMiddlewaresWithNonHttpHandler(): void
-    {
-        $route = new Route('test-route', '/test', 'TestController', 'GET', [], ['TestMiddleware']);
-        $regularHandlerMock = $this->createMock(\Psr\Http\Server\RequestHandlerInterface::class);
-
-        // Should not call class_factory since it's not an HttpHandler
-        $this->class_factory->expects($this->never())->method('build');
-
-        $reflection = new \ReflectionClass($this->router);
-        $method = $reflection->getMethod('configureMiddlewares');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->router, $regularHandlerMock, $route);
-
-        $this->assertSame($regularHandlerMock, $result);
     }
 
     /**

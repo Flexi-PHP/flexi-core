@@ -92,12 +92,13 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 ## Block 4 — Routes and HTTP pipeline
 
-- [ ] Define the route schema: methods, patterns and parameters, name, controller, middleware, and metadata.
+- [x] Document the current Contracts route schema: methods, literal paths, query/form parameters, names, controllers, middleware IDs, and explicit overrides in [`http-routing.md`](http-routing.md).
+- [ ] Decide whether to add parameterized path matching or arbitrary route metadata; defer schema changes until this API decision is reviewed.
 - [x] Resolve route and method conflicts at startup, with the originating configuration file included in the error.
 - [ ] Define route composition by application, module, group, and individual route, including prefixes and ordering.
-- [ ] Make the pipeline use PSR-7/PSR-15 consistently and ensure middleware application does not depend on the controller extending a concrete class.
-- [ ] Resolve middleware via IDs/definitions from the container while respecting aliases, factories, and dependency injection.
-- [ ] Define middleware precedence, short-circuiting, and error handling; test order and response when one stops the chain.
+- [x] Make the pipeline use PSR-7/PSR-15 consistently and ensure middleware application does not depend on the controller extending a concrete class.
+- [x] Resolve middleware via IDs/definitions from the container while respecting aliases, factories, and dependency injection.
+- [x] Define middleware precedence, short-circuiting, and error propagation; test order and response when one stops the chain in [`http-routing.md`](http-routing.md).
 - [ ] Specify the expected HTTP behavior for missing routes, disallowed methods, invalid parameters, and exceptions.
 - [ ] Create reference routes (health check and example route) that demonstrate the contract without coupling business logic to the core.
 

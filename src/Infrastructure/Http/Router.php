@@ -14,7 +14,6 @@ use Flexi\Contracts\Interfaces\EventBusInterface;
 use Flexi\Contracts\Interfaces\ObjectBuilderInterface;
 use Flexi\Domain\Events\Event;
 use Flexi\Domain\Events\RouteNotFoundEvent;
-use Flexi\Contracts\Classes\HttpHandler;
 use Flexi\Infrastructure\Http\Route;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
@@ -22,6 +21,7 @@ use Psr\Container\NotFoundExceptionInterface;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
 class Router
@@ -223,42 +223,40 @@ class Router
         Route $route,
         ServerRequestInterface $request
     ): ResponseInterface {
-        /** @var RequestHandlerInterface $handler */
         $handler = $this->class_factory->build(
             $this->container,
             $route->getController()
         );
+        if (!$handler instanceof RequestHandlerInterface) {
+            throw new \RuntimeException(sprintf(
+                'Route controller "%s" must implement PSR-15 RequestHandlerInterface.',
+                $route->getController()
+            ));
+        }
 
-        // Configure middlewares if the route has them
         if ($route->hasMiddlewares()) {
-            $handler = $this->configureMiddlewares($handler, $route);
+            $handler = new MiddlewarePipelineHandler($handler, $this->resolveMiddlewares($route));
         }
 
         return $handler->handle($request);
     }
 
-    /**
-     * Configures middlewares in the handler if it's an HttpHandler instance.
-     *
-     * @throws ContainerExceptionInterface
-     * @throws NotFoundExceptionInterface
-     * @throws \ReflectionException
-     */
-    private function configureMiddlewares(
-        RequestHandlerInterface $handler,
-        Route $route
-    ): RequestHandlerInterface {
-        if (!$handler instanceof HttpHandler) {
-            return $handler;
-        }
-
+    /** @return MiddlewareInterface[] */
+    private function resolveMiddlewares(Route $route): array
+    {
         $middlewares = [];
-        foreach ($route->getMiddlewares() as $middlewareClass) {
-            $middlewares[] = $this->class_factory->build($this->container, $middlewareClass);
+        foreach ($route->getMiddlewares() as $middlewareId) {
+            $middleware = $this->container->get($middlewareId);
+            if (!$middleware instanceof MiddlewareInterface) {
+                throw new \RuntimeException(sprintf(
+                    'Route middleware "%s" must resolve to PSR-15 MiddlewareInterface; got %s.',
+                    $middlewareId,
+                    is_object($middleware) ? get_class($middleware) : gettype($middleware)
+                ));
+            }
+            $middlewares[] = $middleware;
         }
 
-        $handler->setMiddlewares($middlewares);
-
-        return $handler;
+        return $middlewares;
     }
 }
