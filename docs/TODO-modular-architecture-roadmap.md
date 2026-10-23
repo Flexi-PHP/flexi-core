@@ -81,9 +81,9 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 ## Block 3 — Service lifecycle
 
-- [ ] Document class, alias, and factory definitions with minimal examples and supported argument types.
-- [ ] Define resolution by ID and by interface, including the relationship between aliases, shared instances, and factories.
-- [ ] Allow modules to replace core adapters through an explicit and validated mechanism.
+- [x] Document class, alias, and factory definitions with minimal examples and supported argument types in [`service-definitions.md`](service-definitions.md).
+- [x] Define resolution by ID and by interface, including the relationship between aliases, shared instances, and factories in [`service-definitions.md`](service-definitions.md).
+- [x] Allow modules to replace core adapters through the explicit, validated service decorator mechanism; see [`service-definitions.md`](service-definitions.md) and [`configuration-load-order.md`](configuration-load-order.md).
 - [ ] Ensure removing or deactivating a module removes its definitions from the rebuilt container.
 - [ ] Define cache invalidation for configuration by manifest content/version, file changes, and module state.
 - [ ] Add diagnostics that identify the source of each loaded definition and help explain conflicts.
