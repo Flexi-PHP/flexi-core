@@ -235,17 +235,19 @@ class ContainerFactoryTest extends TestCase
             rename($originalComposerPath, $backupPath);
         }
 
-        // Create invalid JSON
-        file_put_contents($invalidComposerPath, '{"invalid": json}');
+        try {
+            file_put_contents($invalidComposerPath, '{"invalid": json}');
 
-        $container = ContainerFactory::createDefault();
+            $container = ContainerFactory::createDefault();
 
-        $this->assertInstanceOf(Container::class, $container);
-
-        // Restore original composer.json
-        unlink($invalidComposerPath);
-        if (file_exists($backupPath)) {
-            rename($backupPath, $originalComposerPath);
+            $this->assertInstanceOf(Container::class, $container);
+        } finally {
+            if (file_exists($invalidComposerPath)) {
+                unlink($invalidComposerPath);
+            }
+            if (file_exists($backupPath)) {
+                rename($backupPath, $originalComposerPath);
+            }
         }
     }
 
@@ -259,15 +261,16 @@ class ContainerFactoryTest extends TestCase
             mkdir($tempDir, 0755, true);
         }
 
-        chdir($tempDir);
+        try {
+            chdir($tempDir);
 
-        $container = ContainerFactory::createDefault();
+            $container = ContainerFactory::createDefault();
 
-        $this->assertInstanceOf(Container::class, $container);
-
-        // Restore original directory
-        chdir($originalDir);
-        rmdir($tempDir);
+            $this->assertInstanceOf(Container::class, $container);
+        } finally {
+            chdir($originalDir);
+            $this->removeDirectory($tempDir);
+        }
     }
 
     public function testGetInstanceWithMockedDependencies(): void
@@ -403,6 +406,31 @@ class ContainerFactoryTest extends TestCase
             $moduleInfo = $detector->getModuleInfo($moduleName);
             $this->assertTrue($moduleInfo === null || is_object($moduleInfo));
         }
+    }
+
+    private function removeDirectory(string $path): void
+    {
+        if (!is_dir($path)) {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+            return;
+        }
+
+        foreach (scandir($path) ?: [] as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $itemPath = $path . DIRECTORY_SEPARATOR . $item;
+            if (is_dir($itemPath)) {
+                $this->removeDirectory($itemPath);
+            } else {
+                unlink($itemPath);
+            }
+        }
+
+        rmdir($path);
     }
 }
 

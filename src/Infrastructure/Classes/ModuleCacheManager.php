@@ -9,11 +9,11 @@ use Flexi\Domain\ValueObjects\ModuleInfo;
 use Flexi\Domain\ValueObjects\ModuleType;
 
 /**
- * Manages module discovery cache based on composer.lock changes.
+ * Manages module discovery cache based on Composer and module manifest content.
  *
  * This class provides intelligent caching of module discovery results
- * to avoid expensive filesystem scans on every request. Cache is automatically
- * invalidated when composer.lock is modified.
+ * to avoid expensive filesystem scans on every request. Cache is invalidated when
+ * composer.lock or any discovered module composer.json changes.
  */
 class ModuleCacheManager implements ModuleCacheManagerInterface
 {
@@ -111,6 +111,9 @@ class ModuleCacheManager implements ModuleCacheManagerInterface
             foreach ($modules as $module) {
                 $cacheData['modules_by_type'][$type][] = $this->serializeModuleInfo($module);
             }
+            $cacheData['composer_lock_hash'] = $this->getComposerLockHash();
+            $cacheData['module_manifest_hashes'] = $this->getModuleManifestHashes($cacheData['modules_by_type']);
+            $cacheData['module_root_hashes'] = $this->getModuleRootHashes($cacheData['modules_by_type']);
 
             $jsonData = json_encode($cacheData, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
 
@@ -143,12 +146,13 @@ class ModuleCacheManager implements ModuleCacheManagerInterface
 
             $data = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
 
-            if (!isset($data['composer_lock_mtime'])) {
+            if (!isset($data['composer_lock_hash']) || !isset($data['module_manifest_hashes']) || !isset($data['module_root_hashes'])) {
                 return false;
             }
 
-            $currentComposerMtime = $this->getComposerLockModificationTime();
-            return $data['composer_lock_mtime'] === $currentComposerMtime;
+            return $data['composer_lock_hash'] === $this->getComposerLockHash()
+                && $data['module_manifest_hashes'] === $this->getModuleManifestHashes($data['modules_by_type'] ?? [])
+                && $data['module_root_hashes'] === $this->getModuleRootHashes($data['modules_by_type'] ?? []);
         } catch (\JsonException | \Exception $e) {
             return false;
         }
@@ -233,6 +237,83 @@ class ModuleCacheManager implements ModuleCacheManagerInterface
 
         $mtime = filemtime($this->composerLockPath);
         return $mtime !== false ? $mtime : null;
+    }
+
+    private function getComposerLockHash(): ?string
+    {
+        if (!is_file($this->composerLockPath)) {
+            return null;
+        }
+
+        $hash = hash_file('sha256', $this->composerLockPath);
+
+        return $hash === false ? null : $hash;
+    }
+
+    private function getModuleManifestHashes(array $modulesByType): array
+    {
+        $hashes = [];
+        foreach ($modulesByType as $modules) {
+            if (!is_array($modules)) {
+                continue;
+            }
+            foreach ($modules as $module) {
+                if (!is_array($module) || !isset($module['path']) || !is_string($module['path'])) {
+                    continue;
+                }
+                $manifestPath = rtrim($module['path'], DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'composer.json';
+                $hash = is_file($manifestPath) ? hash_file('sha256', $manifestPath) : null;
+                $hashes[$manifestPath] = $hash === false ? null : $hash;
+            }
+        }
+
+        ksort($hashes);
+
+        return $hashes;
+    }
+
+    private function getModuleRootHashes(array $modulesByType): array
+    {
+        $roots = [];
+        foreach ($modulesByType as $type => $modules) {
+            if (!is_array($modules)) {
+                continue;
+            }
+            foreach ($modules as $module) {
+                if (!is_array($module) || !isset($module['path']) || !is_string($module['path'])) {
+                    continue;
+                }
+                $path = rtrim($module['path'], DIRECTORY_SEPARATOR);
+                $root = $type === 'vendor' ? dirname(dirname($path)) : dirname($path);
+                $roots[$type][$root] = true;
+            }
+        }
+
+        $hashes = [];
+        foreach ($roots as $type => $typeRoots) {
+            foreach (array_keys($typeRoots) as $root) {
+                $pattern = $type === 'vendor'
+                    ? $root.DIRECTORY_SEPARATOR.'*'.DIRECTORY_SEPARATOR.'*'
+                    : $root.DIRECTORY_SEPARATOR.'*';
+                $directories = array_filter(glob($pattern) ?: [], 'is_dir');
+                sort($directories);
+                $manifestHashes = [];
+                foreach ($directories as $directory) {
+                    $manifest = $directory.DIRECTORY_SEPARATOR.'composer.json';
+                    $hash = is_file($manifest) ? hash_file('sha256', $manifest) : null;
+                    $manifestHashes[$directory] = $hash === false ? null : $hash;
+                }
+                $hashes[$type][$root] = hash('sha256', json_encode($manifestHashes));
+            }
+        }
+
+        ksort($hashes);
+        foreach ($hashes as &$typeHashes) {
+            ksort($typeHashes);
+        }
+        unset($typeHashes);
+
+        return $hashes;
     }
 
     /**

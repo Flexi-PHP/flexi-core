@@ -85,7 +85,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Define resolution by ID and by interface, including the relationship between aliases, shared instances, and factories in [`service-definitions.md`](service-definitions.md).
 - [x] Allow modules to replace core adapters through the explicit, validated service decorator mechanism; see [`service-definitions.md`](service-definitions.md) and [`configuration-load-order.md`](configuration-load-order.md).
 - [x] Ensure removing or deactivating a module removes its definitions from the rebuilt container; service definitions and instances are now scoped to each container build, with a regression test for a module disappearing between builds.
-- [ ] Define cache invalidation for configuration by manifest content/version, file changes, and module state.
+- [x] Define cache invalidation for configuration by Composer/module manifest content, module directory membership, file content, and activation state in [`cache-invalidation.md`](cache-invalidation.md).
 - [ ] Add diagnostics that identify the source of each loaded definition and help explain conflicts.
 
 **Acceptance:** the developer can add, replace, or remove an implementation using documented rules, and the changes are not hidden by stale cache.

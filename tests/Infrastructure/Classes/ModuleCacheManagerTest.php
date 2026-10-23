@@ -122,12 +122,49 @@ final class ModuleCacheManagerTest extends TestCase
 
         $manager->cacheModules([$module], 'local');
 
-        // Update composer.lock timestamp to invalidate cache
-        // ensure mtime changes without relying on sleep
-        touch($this->composerLockPath, time() + 60);
+        // Change the lock contents while preserving its modification time.
+        $mtime = filemtime($this->composerLockPath);
+        file_put_contents($this->composerLockPath, '{"packages":[]}');
+        touch($this->composerLockPath, $mtime);
 
         $this->assertFalse($manager->isCacheValid());
         $this->assertSame([], $manager->getCachedModules());
+    }
+
+    public function testModuleManifestContentInvalidatesDiscoveryCache(): void
+    {
+        $modulePath = $this->tempDir . '/modules/example';
+        mkdir($modulePath, 0755, true);
+        $manifestPath = $modulePath . '/composer.json';
+        file_put_contents($manifestPath, '{"name":"acme/example","version":"1.0.0"}');
+
+        $manager = new ModuleCacheManager($this->cacheDir, $this->tempDir);
+        $module = new ModuleInfo('example', 'acme/example', ModuleType::local(), $modulePath, '1.0.0');
+        $this->assertTrue($manager->cacheModules([$module], 'local'));
+        $this->assertTrue($manager->isCacheValid());
+
+        file_put_contents($manifestPath, '{"name":"acme/renamed","version":"2.0.0"}');
+
+        $this->assertFalse($manager->isCacheValid());
+    }
+
+    public function testAddingModuleInvalidatesDiscoveryCache(): void
+    {
+        $moduleRoot = $this->tempDir . '/modules';
+        $firstModulePath = $moduleRoot . '/first';
+        mkdir($firstModulePath, 0755, true);
+        file_put_contents($firstModulePath . '/composer.json', '{"name":"acme/first"}');
+
+        $manager = new ModuleCacheManager($this->cacheDir, $this->tempDir);
+        $module = new ModuleInfo('first', 'acme/first', ModuleType::local(), $firstModulePath, '1.0.0');
+        $this->assertTrue($manager->cacheModules([$module], 'local'));
+        $this->assertTrue($manager->isCacheValid());
+
+        $secondModulePath = $moduleRoot . '/second';
+        mkdir($secondModulePath, 0755, true);
+        file_put_contents($secondModulePath . '/composer.json', '{"name":"acme/second"}');
+
+        $this->assertFalse($manager->isCacheValid());
     }
 
     public function testCorruptedCacheReturnsEmptyArray(): void
@@ -196,6 +233,9 @@ final class ModuleCacheManagerTest extends TestCase
         $content = json_encode([
             'timestamp' => time(),
             'composer_lock_mtime' => filemtime($this->composerLockPath),
+            'composer_lock_hash' => hash_file('sha256', $this->composerLockPath),
+            'module_manifest_hashes' => [],
+            'module_root_hashes' => [],
         ], JSON_THROW_ON_ERROR);
 
         file_put_contents($cachePath, $content);
@@ -213,15 +253,29 @@ final class ModuleCacheManagerTest extends TestCase
             mkdir($cacheDir, 0755, true);
         }
 
+        $moduleRoot = $this->tempDir . '/modules';
+        $modulePath = $moduleRoot . '/partial';
+        mkdir($modulePath, 0755, true);
+        file_put_contents($modulePath . '/composer.json', '{}');
+        $manifestRootHashes = [
+            'local' => [
+                $moduleRoot => hash('sha256', json_encode([
+                    $modulePath => hash_file('sha256', $modulePath . '/composer.json'),
+                ])),
+            ],
+        ];
         $content = json_encode([
             'timestamp' => time(),
             'composer_lock_mtime' => filemtime($this->composerLockPath),
+            'composer_lock_hash' => hash_file('sha256', $this->composerLockPath),
+            'module_manifest_hashes' => [$modulePath . '/composer.json' => hash_file('sha256', $modulePath . '/composer.json')],
+            'module_root_hashes' => $manifestRootHashes,
             'modules_by_type' => [
                 'local' => [
                     [
                         'name' => 'partial',
                         'type' => 'mixed',
-                        'path' => '/modules/partial',
+                        'path' => $modulePath,
                     ],
                 ],
             ],
