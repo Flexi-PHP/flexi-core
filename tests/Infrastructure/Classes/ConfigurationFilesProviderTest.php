@@ -148,6 +148,54 @@ class ConfigurationFilesProviderTest extends TestCase
         $this->assertNull($result);
     }
 
+    public function testGetConfigurationFilesUsesComposerDeclaredPaths(): void
+    {
+        $modulePath = $this->temporaryModulesPath . '/Auth';
+        $configPath = $modulePath . '/config';
+        $this->createDirectory($configPath);
+        file_put_contents($configPath . '/routes.json', '{"routes":[]}');
+
+        $module = new ModuleInfo(
+            'Auth',
+            'cubadevops/flexi-module-auth',
+            ModuleType::vendor(),
+            $modulePath,
+            '1.0.0',
+            false,
+            ['flexi' => ['config-files' => ['config/routes.json']]]
+        );
+        $this->moduleDetector->method('getAllModules')->willReturn([$module]);
+        $this->stateManager->method('isModuleActive')->willReturn(true);
+
+        $files = $this->provider->getConfigurationFiles(ConfigurationType::routes(), false);
+
+        $this->assertSame([realpath($configPath . '/routes.json')], $files);
+        $this->assertSame(
+            realpath($configPath . '/routes.json'),
+            $this->provider->getModuleConfigurationFile('Auth', ConfigurationType::routes())
+        );
+    }
+
+    public function testGetModuleConfigurationFileRejectsPathsOutsideModule(): void
+    {
+        $modulePath = $this->temporaryModulesPath . '/Unsafe';
+        $this->createDirectory($modulePath);
+        file_put_contents($this->temporaryModulesPath . '/routes.json', '{"routes":[]}');
+
+        $module = new ModuleInfo(
+            'Unsafe',
+            'vendor/unsafe',
+            ModuleType::local(),
+            $modulePath,
+            null,
+            false,
+            ['flexi' => ['config-files' => ['../routes.json']]]
+        );
+        $this->moduleDetector->method('getAllModules')->willReturn([$module]);
+
+        $this->assertNull($this->provider->getModuleConfigurationFile('Unsafe', ConfigurationType::routes()));
+    }
+
     public function testConfigurationTypeHelpersRemainConsistent(): void
     {
         $expectedTypes = ['services', 'routes', 'commands', 'queries', 'listeners'];
