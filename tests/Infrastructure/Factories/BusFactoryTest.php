@@ -39,10 +39,6 @@ class BusFactoryTest extends TestCase
         $this->configFilesProvider = $this->createMock(ConfigurationFilesProviderInterface::class);
 
         // Configure default behavior for mocks
-        $this->configFilesProvider->method('getConfigurationFiles')->willReturn([]);
-        $this->handlersParser->method('parse')->willReturn([]);
-        $this->listenersParser->method('parse')->willReturn([]);
-
         // Configure container mock to return our mocked services
         $this->container
             ->method('get')
@@ -118,6 +114,52 @@ class BusFactoryTest extends TestCase
         $this->expectExceptionMessage('Invalid bus type');
 
         $factory->getInstance('InvalidBusType');
+    }
+
+    public function testDuplicateHandlerIdsAcrossFilesAreRejected(): void
+    {
+        $firstFile = '/modules/One/Config/commands.json';
+        $secondFile = '/modules/Two/Config/commands.json';
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturn([$firstFile, $secondFile]);
+        $this->handlersParser->method('parse')->willReturnOnConsecutiveCalls(
+            [['id' => 'App\\Command', 'handler' => 'App\\CommandHandler', 'cli_alias' => null]],
+            [['id' => 'App\\Command', 'handler' => 'Other\\CommandHandler', 'cli_alias' => null]]
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(sprintf('Handler ID "App\\Command" is defined in both %s and %s.', $firstFile, $secondFile));
+        $this->createBusFactory()->getInstance(CommandBus::class);
+    }
+
+    public function testNewBusBuildDoesNotRetainInactiveModuleHandlers(): void
+    {
+        $file = '/modules/Optional/Config/commands.json';
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturnOnConsecutiveCalls([$file], []);
+        $this->handlersParser->method('parse')->with($file, $this->anything())->willReturn([
+            ['id' => 'App\\OptionalCommand', 'handler' => 'App\\OptionalCommandHandler', 'cli_alias' => null],
+        ]);
+
+        $factory = $this->createBusFactory();
+        $activeBus = $factory->getInstance(CommandBus::class);
+        $inactiveBus = $factory->getInstance(CommandBus::class);
+
+        $this->assertTrue($activeBus->hasHandler('App\\OptionalCommand'));
+        $this->assertFalse($inactiveBus->hasHandler('App\\OptionalCommand'));
+    }
+
+    public function testHandlerAliasCannotCollideWithAnotherHandlerId(): void
+    {
+        $firstFile = '/modules/One/Config/commands.json';
+        $secondFile = '/modules/Two/Config/commands.json';
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturn([$firstFile, $secondFile]);
+        $this->handlersParser->method('parse')->willReturnOnConsecutiveCalls(
+            [['id' => 'App\\FirstCommand', 'handler' => 'App\\FirstHandler', 'cli_alias' => 'shared']],
+            [['id' => 'shared', 'handler' => 'App\\SecondHandler', 'cli_alias' => null]]
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('conflicts with alias declared in');
+        $this->createBusFactory()->getInstance(CommandBus::class);
     }
 
     public function testGetInstanceWithoutLoggerService(): void

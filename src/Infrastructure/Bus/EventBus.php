@@ -139,9 +139,22 @@ class EventBus implements EventBusInterface
             return;
         }
 
-        /** @var EventListenerInterface $listener_obj */
-        $listener_obj = $this->class_factory->build($this->container, $listener);
+        $listener_obj = $this->resolveListener($listener);
+        if (!$listener_obj instanceof EventListenerInterface) {
+            throw new \RuntimeException(sprintf(
+                'Event listener "%s" must implement %s.',
+                $listener,
+                EventListenerInterface::class
+            ));
+        }
         $listener_obj->handle($event);
+    }
+
+    private function resolveListener(string $listener): object
+    {
+        return $this->container->has($listener)
+            ? $this->container->get($listener)
+            : $this->class_factory->build($this->container, $listener);
     }
 
     private function closeBuffers(): void

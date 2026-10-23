@@ -71,8 +71,14 @@ class CommandBus implements BusInterface
 
         $handler = $this->getHandler($identifier);
 
-        /** @var HandlerInterface $handler_obj */
-        $handler_obj = $this->class_factory->build($this->container, $handler);
+        $handler_obj = $this->resolveHandler($handler);
+        if (!$handler_obj instanceof HandlerInterface) {
+            throw new \RuntimeException(sprintf(
+                'Command handler "%s" must implement %s.',
+                $handler,
+                HandlerInterface::class
+            ));
+        }
 
         $event_before = new Event('core.command.before_execute', __CLASS__, [
             'command' => $identifier,
@@ -85,6 +91,13 @@ class CommandBus implements BusInterface
         $this->event_bus->dispatch($event_after);
 
         return $response;
+    }
+
+    private function resolveHandler(string $handler): object
+    {
+        return $this->container->has($handler)
+            ? $this->container->get($handler)
+            : $this->class_factory->build($this->container, $handler);
     }
 
     public function getHandler(string $identifier): string

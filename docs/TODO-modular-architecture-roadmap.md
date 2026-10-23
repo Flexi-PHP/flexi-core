@@ -107,11 +107,11 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 ## Block 5 — Listeners, commands, and queries
 
 - [ ] Define registration contracts for listeners, commands, and queries, including the ID and handler class.
-- [ ] Enforce listener priority and establish stable tie-break rules.
-- [ ] Define whether handlers are unique by ID or whether multiple are allowed; validate that policy.
-- [ ] Verify that each listener/handler is instantiable by the container and compatible with its contract before accepting traffic/work.
-- [ ] Define how errors are reported and how propagation is stopped in listeners; do not hide exceptions without an explicit policy.
-- [ ] Ensure that activating or deactivating a module adds or removes all its registrations in a clean rebuild.
+- [x] Establish listener ordering and tie-break rules: equal priority, then stable configuration/definition/listener registration order; specific event listeners precede wildcard listeners.
+- [x] Define handler cardinality: one command/query handler per ID, with unique aliases; multiple event listeners per event are allowed. Collisions fail with source files.
+- [ ] Verify that each listener/handler is instantiable by the container and compatible with its contract before accepting traffic/work. Eager construction is deferred pending agreement about constructor side effects.
+- [x] Define error propagation and listener stop behavior: handler/listener exceptions propagate, and stopped events skip later listeners; see [`message-handlers.md`](message-handlers.md).
+- [x] Ensure that activating or deactivating a module adds or removes all its registrations in a clean rebuild; bus builds use the current configuration file set, covered by a regression test.
 
 **Acceptance:** priorities and order are observable and deterministic; handler errors are detected with their originating module; inactive modules leave no lingering listeners or handlers behind.
 
