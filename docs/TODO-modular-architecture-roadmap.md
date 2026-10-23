@@ -131,14 +131,27 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 - [x] Cover schemas for services, routes, listeners, commands, and queries and activation/deactivation registration rebuilds in `ConfigurationValidatorTest`, parser/factory tests, and module activation tests.
 - [ ] Test HTTP routes and middlewares with the Docker stack, verifying status codes, headers, order, and errors.
-- [ ] Test resolution and collisions of services, listeners, commands, and queries with independent modules.
+- [x] Test duplicate service IDs, handler IDs/aliases, and route names across multiple configuration files at their factory boundaries in `ContainerFactoryTest`, `BusFactoryTest`, and `RouterFactoryTest`.
+- [ ] Exercise full resolution and collisions across independently installed Composer modules, including event listeners and route method/path pairs.
 - [x] Test cache hit/miss behavior and Composer lock, module manifest, module membership, and configuration content changes in `ModuleCacheManagerTest`, parser tests, and cache invalidation tests.
-- [ ] Add a minimal module template with a route, service, middleware, and optional listener.
-- [ ] Document atomic recipes: install/activate, add a capability, replace an adapter, deactivate, and remove.
-- [ ] Align README, historical documentation, and examples with the implemented behavior; mark old proposals as deprecated.
+- [x] Add a minimal module template with a route, service, middleware, and optional listener in [`module-template.md`](module-template.md).
+- [x] Document atomic recipes for install/activate, add a capability, replace an adapter, deactivate, and remove in [`module-recipes.md`](module-recipes.md).
+- [x] Align the main README's installation, middleware, and module-guide examples with current behavior.
+- [ ] Audit historical documentation and examples against current behavior; mark obsolete proposals as deprecated.
 - [ ] Define CI for static validation, unit tests, integration tests, and compatibility with supported versions.
 
 **Acceptance:** a new developer can follow the template to add and remove a capability without editing core internals; CI reproduces the documented checks.
+
+## Deferred decisions and verification
+
+These items stay open because they change observable contracts or need an explicit deployment policy:
+
+- Route API and HTTP outcomes: path parameters and route metadata; group/prefix composition and ordering; behavior for an empty route table, 404, method mismatch, invalid input, and exceptions; and reference health/example routes.
+- Handler preflight: decide whether startup may construct handlers/listeners and trigger user-defined constructor side effects, or whether validation remains lazy.
+- Production mode and performance: define environment selection, cache artifact lifetime/invalidation, process rebuild expectations, and a reproducible baseline (minimal app versus installed modules) before implementing production-specific behavior or optimizing.
+- End-to-end module verification: exercise real Composer-installed modules through discovery, activation, container/router/bus construction, HTTP dispatch, deactivation, and removal. Current tests cover schema, parsers, factories, and rebuild behavior at unit/factory boundaries.
+- Debug CLI smoke test: in the current PHP 7.4.33 container, `modules:list` completes with `debug=false`, but with the development default `debug=true` Symfony's debug class loader promotes an Opis `UnicodeString::offsetSet()` return-type deprecation to an exception during service configuration validation. Decide the supported deprecation policy or dependency compatibility fix before calling the CLI smoke test complete.
+- Historical docs: audit older proposals and examples before marking them deprecated; their intended archival status and translation scope need review.
 
 ## Progress rule
 

@@ -93,6 +93,8 @@ For example, a module can declare its routes and services like this:
 
 The available module console commands are defined in [`src/Config/commands.json`](src/Config/commands.json). Install package dependencies with Composer, then use the registered `modules:list`, `modules:status`, `modules:activate`, `modules:deactivate`, `modules:info`, `modules:validate`, and `modules:env-update` commands as appropriate. The module lifecycle documentation describes which behaviors are implemented and which remain roadmap items.
 
+For a copyable module structure and operational steps, see the [minimal module template](docs/module-template.md) and [module recipes](docs/module-recipes.md).
+
 ## Configuration
 
 Configuration for Flexi is managed through JSON files. These files define services, routes, events, queries, and
@@ -164,7 +166,7 @@ Routes are defined in `routes.json`. Each route specifies a name, path, HTTP met
       "method": "GET",
       "controller": "App\\Http\\HealthController",
       "parameters": [],
-      "middlewares": ["App\\Http\\Middleware\\AuthMiddleware"]
+      "middlewares": ["auth.middleware"]
     },
     {
       "name": "account.profile",
@@ -179,10 +181,23 @@ Routes are defined in `routes.json`. Each route specifies a name, path, HTTP met
 
 __Note:__
 
-- Controllers must implement `Psr\Http\Server\RequestHandlerInterface`. Route middleware is applied by the router when the controller extends `Flexi\Contracts\Classes\HttpHandler`.
+- Controllers must implement `Psr\Http\Server\RequestHandlerInterface`. Each route middleware ID must resolve from the PSR-11 container and resolve to a `Psr\Http\Server\MiddlewareInterface` instance. The router applies configured middleware regardless of the controller's base class.
 - The optional `parameters` key declares required query or form parameters; it does not define path placeholders.
-- The optional `middlewares` key is used to define the middlewares that should be executed before the controller. They are executed in the order they are defined and can stop the execution chain if they return a response directly or pass the request to the next middleware.
+- The optional `middlewares` key lists container IDs for middleware to execute before the controller. They run in the listed order, with the first entry outermost. Middleware can short-circuit by returning a response without calling the next handler.
 - Modules list route configuration files in `extra.flexi.config-files`; the core loads files from active modules.
+
+Register each middleware ID in `services.json`, for example:
+
+```json
+{
+  "services": [
+    {
+      "name": "auth.middleware",
+      "class": {"name": "App\\Http\\Middleware\\AuthMiddleware"}
+    }
+  ]
+}
+```
 
 Routes with duplicate names or `METHOD path` pairs fail at startup. A module can intentionally replace a route by setting `overrides` to the existing route name; the replacement must keep that same name. Routes sharing a path with different HTTP methods are supported.
 
@@ -333,48 +348,38 @@ use Flexi\Infrastructure\Bus\QueryBus;
 $result = $queryBus->execute($query);
 ```
 
-### Controllers and Response
+### Controllers and Responses
 
-The response is a PSR-7 response object that can be returned from a controller or middleware. Controllers that extend `Flexi\Contracts\Classes\HttpHandler` can build responses with `createResponse()`. Its constructor requires a `Psr\Http\Message\ResponseFactoryInterface`, supplied by the container. Flexi uses `GuzzleHttp\Psr7\HttpFactory` as the default factory.
-
-The `HttpHandler` abstract class implements a Template Method pattern that automatically manages the middleware chain execution. Controllers only need to implement the `process()` method with their specific business logic, while the framework handles middleware orchestration automatically.
-
-#### Basic Controller Example
+Route controllers implement PSR-15 `RequestHandlerInterface` and return a PSR-7 response. The router resolves the controller and wraps it with the route's declared middleware; this behavior does not depend on extending a Flexi base class. The default `ResponseFactoryInterface` service uses `GuzzleHttp\Psr7\HttpFactory`.
 
 ```php
-namespace Flexi\Modules\Home\Infrastructure\Controllers;
+namespace App\Http;
 
-use Flexi\Contracts\Classes\HttpHandler;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
 
-class AuthenticatedController extends HttpHandler
+final class GreetingHandler implements RequestHandlerInterface
 {
-    public function __construct(ResponseFactoryInterface $responseFactory)
+    private ResponseFactoryInterface $responses;
+
+    public function __construct(ResponseFactoryInterface $responses)
     {
-        parent::__construct($responseFactory);
+        $this->responses = $responses;
     }
 
-    protected function process(ServerRequestInterface $request): ResponseInterface
+    public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        // This method is called automatically after all middlewares have been processed
-        $response = $this->createResponse();
-        $response->getBody()->write('Authorized');
+        $response = $this->responses->createResponse(200);
+        $response->getBody()->write('Hello');
 
         return $response;
     }
 }
 ```
 
-#### Key Points
-
-- **No manual middleware handling**: The `handle()` method is `final` and manages the middleware chain automatically
-- **Focus on business logic**: Controllers only implement the `process()` method with their specific logic
-- **Dependency injection**: Use constructor injection to receive dependencies from the DI container
-- **Template Method pattern**: The framework ensures middlewares are executed before your controller logic
-- **PSR-7 compliance**: All controllers work with PSR-7 request/response objects
-- **Error handling**: Return appropriate HTTP status codes using `createResponse($code, $reasonPhrase)`
+`Flexi\Contracts\Classes\HttpHandler` remains available as a convenience base class for creating PSR-7 responses. The route middleware declared in `routes.json` is composed by the router independently of that base class. See the [minimal module template](docs/module-template.md) for a complete controller and middleware example.
 
 ### Middlewares
 
