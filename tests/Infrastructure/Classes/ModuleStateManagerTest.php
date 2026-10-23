@@ -119,8 +119,18 @@ final class ModuleStateManagerTest extends TestCase
         $this->assertSame('removed', $summary['actions']['gamma']);
         $this->assertEmpty($summary['errors']);
 
+        $this->assertFalse($manager->getModuleState('alpha')->isActive());
         $this->assertTrue($manager->getModuleState('beta')->getType()->equals(ModuleType::vendor()));
+        $this->assertTrue($manager->getModuleState('beta')->isActive());
         $this->assertNull($manager->getModuleState('gamma'));
+    }
+
+    public function testInitializeModuleStateDefaultsToInactive(): void
+    {
+        $manager = new ModuleStateManager(new InMemoryModuleStateRepository());
+
+        $this->assertTrue($manager->initializeModuleState('new-module', ModuleType::vendor()));
+        $this->assertFalse($manager->isModuleActive('new-module'));
     }
 
     public function testImportExportStatisticsAndBackup(): void
