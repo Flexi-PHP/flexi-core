@@ -114,7 +114,7 @@ class BusFactory
         $handlerFiles = $this->config_files_provider->getConfigurationFiles($configType);
 
         foreach ($handlerFiles as $file) {
-            $handlers = $this->handlers_parser->parse($file);
+            $handlers = $this->handlers_parser->parse($file, $configType);
             foreach ($handlers as $handler) {
                 $bus->register($handler['id'], $handler['handler'], $handler['cli_alias'] ?? null);
             }

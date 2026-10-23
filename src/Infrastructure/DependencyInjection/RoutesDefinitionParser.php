@@ -19,11 +19,13 @@ class RoutesDefinitionParser
     private const ERROR_FILE_NOT_FOUND = 'Routes file not found: %s';
 
     private CacheInterface $cache;
+    private ConfigurationValidator $configurationValidator;
     private array $filesProcessed = [];
 
     public function __construct(CacheInterface $cache)
     {
         $this->cache = $cache;
+        $this->configurationValidator = new ConfigurationValidator();
         $this->filesProcessed = $cache->get(self::ROUTE_DEFINITION_FILES_KEY, []);
     }
 
@@ -37,6 +39,7 @@ class RoutesDefinitionParser
         $filename = $this->normalize($filename);
 
         $this->ensureFileExists($filename);
+        $this->configurationValidator->validateFile('routes', $filename);
 
         if ($this->isFileProcessed($filename)) {
             return $this->getCachedRoutes($filename);

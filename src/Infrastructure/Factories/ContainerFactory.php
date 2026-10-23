@@ -9,6 +9,7 @@ use Flexi\Infrastructure\Classes\ModuleStateRepository;
 use Flexi\Contracts\Interfaces\CacheInterface;
 use Flexi\Contracts\Interfaces\ObjectBuilderInterface;
 use Flexi\Infrastructure\DependencyInjection\ServicesDefinitionParser;
+use Flexi\Infrastructure\DependencyInjection\ConfigurationValidator;
 use Flexi\Infrastructure\Classes\Configuration;
 use Flexi\Infrastructure\Classes\ConfigurationRepository;
 use Flexi\Infrastructure\Classes\ObjectBuilder;
@@ -54,6 +55,13 @@ class ContainerFactory
      */
     public function getInstance(): Container
     {
+        $configurationValidator = new ConfigurationValidator();
+        foreach ($this->config_files_provider->getAllConfigurationFiles() as $type => $files) {
+            foreach ($files as $file) {
+                $configurationValidator->validateFile($type, $file);
+            }
+        }
+
         $container = new Container($this->cache, $this->object_builder);
 
         // Use configuration files provider to discover all service files

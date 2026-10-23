@@ -102,6 +102,36 @@ class ContainerFactoryTest extends TestCase
         $this->assertInstanceOf(Container::class, $container);
     }
 
+    public function testValidatesAllConfigurationFilesBeforeRegisteringServices(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'invalid-route-');
+        file_put_contents($file, json_encode([
+            'routes' => [[
+                'name' => 'health',
+                'path' => '/health',
+                'method' => 'FETCH',
+                'controller' => 'HealthController',
+            ]],
+        ]));
+
+        $this->configFilesProvider
+            ->method('getAllConfigurationFiles')
+            ->willReturn(['routes' => [$file]]);
+        $this->servicesDefinitionParser
+            ->expects($this->never())
+            ->method('parse');
+
+        $factory = new ContainerFactory($this->cache, $this->objectBuilder, $this->servicesDefinitionParser, $this->configFilesProvider);
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Invalid configuration');
+            $factory->getInstance();
+        } finally {
+            unlink($file);
+        }
+    }
+
     public function testCreateDefaultWithoutParameters(): void
     {
         $container = ContainerFactory::createDefault();

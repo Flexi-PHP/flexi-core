@@ -7,6 +7,7 @@ namespace Flexi\Infrastructure\DependencyInjection;
 use Flexi\Contracts\Classes\Traits\FileHandlerTrait;
 use Flexi\Contracts\Classes\Traits\JsonFileReader;
 use Flexi\Contracts\Interfaces\CacheInterface;
+use Flexi\Domain\ValueObjects\ConfigurationType;
 
 class HandlersDefinitionParser
 {
@@ -18,22 +19,26 @@ class HandlersDefinitionParser
     private const ERROR_FILE_NOT_FOUND = 'Handlers file not found: %s';
 
     private CacheInterface $cache;
+    private ConfigurationValidator $configurationValidator;
     private array $filesProcessed = [];
 
     public function __construct(CacheInterface $cache)
     {
         $this->cache = $cache;
+        $this->configurationValidator = new ConfigurationValidator();
         $this->filesProcessed = $cache->get(self::HANDLERS_DEFINITION_FILES_KEY, []);
     }
 
     /**
      * Parses a handlers definition file and returns the handlers.
      */
-    public function parse(string $filename): array
+    public function parse(string $filename, ?ConfigurationType $configurationType = null): array
     {
         $filename = $this->normalize($filename);
 
         $this->ensureFileExists($filename);
+        $type = $configurationType ? $configurationType->value() : basename($filename, '.json');
+        $this->configurationValidator->validateFile($type, $filename);
 
         if ($this->isFileProcessed($filename)) {
             return $this->getCachedHandlers($filename);

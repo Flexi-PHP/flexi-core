@@ -21,12 +21,14 @@ class ServicesDefinitionParser
     private const ERROR_FILE_NOT_FOUND = 'Service file not found: %s';
 
     private CacheInterface $cache;
+    private ConfigurationValidator $configurationValidator;
     private array $serviceDefinitions = [];
     private array $filesProcessed = [];
 
     public function __construct(CacheInterface $cache)
     {
         $this->cache = $cache;
+        $this->configurationValidator = new ConfigurationValidator();
         $this->filesProcessed = $cache->get(self::SERVICE_DEFINITION_FILES_KEY, []);
     }
 
@@ -38,6 +40,7 @@ class ServicesDefinitionParser
         $filename = $this->normalize($filename);
 
         $this->ensureFileExists($filename);
+        $this->configurationValidator->validateFile('services', $filename);
 
         if ($this->isFileProcessed($filename)) {
             return $this->getCachedServices($filename);

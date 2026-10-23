@@ -71,7 +71,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 ## Block 2 — Configuration validation and composition
 
 - [x] Define machine-readable schemas for `services`, `routes`, `listeners`, `commands`, and `queries` in [`flexi/contracts`](https://github.com/Flexi-PHP/flexi-contracts/tree/v5.1.0/schemas/configuration/v1), the single source of truth for the core and modules.
-- [ ] Validate all active module files before registering components; report file, module, key, and error cause.
+- [x] Validate all active module files against the Contracts schemas before registering components; report module, file, JSON path, and validation cause.
 - [ ] Detect duplicate service IDs, names/routes, and handler registrations; fail explicitly instead of ignoring or silently overwriting.
 - [ ] Define a deliberate policy for service replacement/decoration; do not let load order accidentally decide the implementation.
 - [ ] Define and validate circular or incompatible dependencies between modules before building the application.

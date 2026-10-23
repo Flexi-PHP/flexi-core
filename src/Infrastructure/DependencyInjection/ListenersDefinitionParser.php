@@ -18,11 +18,13 @@ class ListenersDefinitionParser
     private const ERROR_FILE_NOT_FOUND = 'Listeners file not found: %s';
 
     private CacheInterface $cache;
+    private ConfigurationValidator $configurationValidator;
     private array $filesProcessed = [];
 
     public function __construct(CacheInterface $cache)
     {
         $this->cache = $cache;
+        $this->configurationValidator = new ConfigurationValidator();
         $this->filesProcessed = $cache->get(self::LISTENERS_DEFINITION_FILES_KEY, []);
     }
 
@@ -34,6 +36,7 @@ class ListenersDefinitionParser
         $filename = $this->normalize($filename);
 
         $this->ensureFileExists($filename);
+        $this->configurationValidator->validateFile('listeners', $filename);
 
         if ($this->isFileProcessed($filename)) {
             return $this->getCachedListeners($filename);
@@ -84,12 +87,12 @@ class ListenersDefinitionParser
     {
         $listeners = [];
 
-        if (isset($definitions['listeners'])) {
-            foreach ($definitions['listeners'] as $entry) {
+        foreach ($definitions as $eventDefinition) {
+            foreach ($eventDefinition['listeners'] as $handler) {
                 $listeners[] = [
-                    'event' => $entry['event'],
-                    'handler' => $entry['handler'],
-                    'priority' => $entry['priority'] ?? 0
+                    'event' => $eventDefinition['event'],
+                    'handler' => $handler,
+                    'priority' => 0
                 ];
             }
         }
