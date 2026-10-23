@@ -55,7 +55,7 @@
     "fix": "psalter --issues=all",
     "format": "php-cs-fixer fix --rules=@PSR12,@Symfony,declare_strict_types --allow-risky=yes .",
     "post-root-package-install": [
-      "@php -r \"file_exists('.env') || copy('env.example', '.env');\"",
+      "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
       "@php -r \"if (!file_exists('var/logs')) { mkdir('var/logs', 0777, true); } touch('var/logs/app.log');\""
     ],
     "post-install-cmd": [
