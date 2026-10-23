@@ -18,6 +18,7 @@ class Container implements ContainerInterface
 
     private array $serviceDefinitions;
     private array $serviceInstances = [];
+    private array $serviceSources = [];
     private array $selfReference = ['container', ContainerInterface::class];
 
     private ObjectBuilderInterface $factory;
@@ -41,13 +42,16 @@ class Container implements ContainerInterface
      * @param string              $id                The service ID
      * @param string|array|object $serviceDefinition The service definition
      */
-    public function set(string $id, $serviceDefinition): void
+    public function set(string $id, $serviceDefinition, ?string $source = null): void
     {
         if ($this->has($id)) {
             return;
         }
 
         $this->validateServiceDefinition($id, $serviceDefinition);
+        if ($source !== null) {
+            $this->serviceSources[$id] = $source;
+        }
 
         if (is_object($serviceDefinition) && !is_callable($serviceDefinition)) {
             $this->serviceInstances[$id] = $serviceDefinition;
@@ -66,6 +70,16 @@ class Container implements ContainerInterface
         return in_array($id, $this->selfReference, true)
             || isset($this->serviceDefinitions[$id])
             || isset($this->serviceInstances[$id]);
+    }
+
+    /**
+     * Return the configuration file that contributed each registered service definition.
+     *
+     * @return string[] Service ID to configuration file path.
+     */
+    public function getServiceSources(): array
+    {
+        return $this->serviceSources;
     }
 
     /**
@@ -95,7 +109,11 @@ class Container implements ContainerInterface
         try {
             $serviceInstance = $this->resolveServiceInstance($id);
         } catch (\Throwable $th) {
-            throw new ServiceNotFoundException(sprintf('Class %s does not exist', $id), 0, $th);
+            $source = $this->serviceSources[$id] ?? null;
+            $message = $source === null
+                ? sprintf('Class %s does not exist', $id)
+                : sprintf('Unable to resolve service "%s" from %s: %s', $id, $source, $th->getMessage());
+            throw new ServiceNotFoundException($message, 0, $th);
         }
 
         $this->serviceInstances[$id] = $serviceInstance;

@@ -103,7 +103,7 @@ class ContainerFactory
         $this->applyDecorators($definitions, $sources);
 
         foreach ($definitions as $name => $service) {
-            $container->set($name, $service);
+            $container->set($name, $service, $sources[$name] ?? null);
         }
 
         return $container;

@@ -163,6 +163,27 @@ class ContainerFactoryTest extends TestCase
         $this->assertFalse($inactiveContainer->has('optional.service'));
     }
 
+    public function testContainerExposesDefinitionSourcesAndAddsSourceToResolutionErrors(): void
+    {
+        $file = '/modules/Mailer/Config/services.json';
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturn([$file]);
+        $this->servicesDefinitionParser->method('parse')->with($file)->willReturn([
+            'broken.mailer' => ['class' => ['name' => 'MissingMailerClass']],
+        ]);
+
+        $cache = new InMemoryCache();
+        $builder = new ObjectBuilder($cache);
+        $factory = new ContainerFactory($cache, $builder, $this->servicesDefinitionParser, $this->configFilesProvider);
+        $container = $factory->getInstance();
+
+        $this->assertSame(['broken.mailer' => $file], $container->getServiceSources());
+
+        $this->expectException(\Flexi\Domain\Exceptions\ServiceNotFoundException::class);
+        $this->expectExceptionMessage(sprintf('Unable to resolve service "broken.mailer" from %s', $file));
+        $container->get('broken.mailer');
+    }
+
     public function testDuplicateServiceIdsAcrossFilesAreRejected(): void
     {
         $files = ['/modules/One/Config/services.json', '/modules/Two/Config/services.json'];

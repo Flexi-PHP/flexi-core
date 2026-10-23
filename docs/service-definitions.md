@@ -88,6 +88,10 @@ Duplicate IDs are rejected, including when a module attempts to redefine a core 
 
 Decoration replaces the target's resolved definition for the built container. The decorator must accept the inner service as a constructor argument. Use a distinct decorator ID and target an existing definition; implicit replacement is not supported. Multiple decorators must form one explicit chain, and ambiguous chains or missing targets fail the build.
 
+## Definition source diagnostics
+
+The built container exposes `getServiceSources()`, returning a map from each configuration-defined service ID to the file that registered it. Startup collision and decorator errors include their source files. If resolving a configured service fails, the resulting `ServiceNotFoundException` includes its ID and source file; definitions registered directly with `Container::set()` have no configuration source.
+
 ## Module removal and rebuilds
 
 The container is built from the core and active modules' service files. Deactivating or removing a module affects a newly built container; it does not mutate an existing container or remove objects already held by application code. Runtime cache invalidation and transactional rebuild behavior are tracked separately in the modular architecture roadmap.
