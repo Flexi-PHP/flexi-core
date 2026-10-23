@@ -30,7 +30,7 @@ The Flexi core is not a module dependency. Core compatibility is declared in `ex
 
 Package dependencies are expressed through Composer's `require` and `suggest` fields and are not repeated in Flexi metadata. A required module dependency must use that module's Composer package name and version constraint.
 
-Capability identifiers describe what a module offers; they do not install or activate the module and do not replace a dependency declaration. Capability discovery and dependency validation will be implemented in a later roadmap item.
+Capability identifiers describe what a module offers; they do not install or activate the module and do not replace a dependency declaration. Capability discovery is a later roadmap item. Composer resolves package dependencies during installation; before building the runtime, the core checks active modules' declared core compatibility, verifies that required installed modules are also active and satisfy their version constraints, and rejects circular active-module dependencies.
 
 ## Example
 
@@ -71,4 +71,4 @@ The `^8.2` and `^4.0` values are illustrative. A module must declare the PHP and
 
 ## Current implementation status
 
-The core reads the canonical `extra.flexi` block and consumes `config-files`. Vendor discovery reads `module-name` (and the historical `name` alias), while local discovery still derives the module identifier from the directory name; making those paths consistent is still pending. The core does not yet validate `schema-version`, core compatibility, `provides`, or dependency compatibility. Until that validation is implemented, these fields are a documented contract for module authors, not a guarantee that startup rejects invalid values. The historical `extra.flexi-module` format is legacy input and is not part of the canonical schema.
+The core reads the canonical `extra.flexi` block and consumes `config-files`. Vendor discovery reads `module-name` (and the historical `name` alias), while local discovery still derives the module identifier from the directory name; making those paths consistent is still pending. Runtime dependency validation runs during the default container build. It validates `compatibility.core` when present and checks dependency versions using `composer.lock` or the module's declared version. The core does not yet validate `schema-version` or `provides`, and it does not reject a missing `compatibility.core` field. The historical `extra.flexi-module` format is legacy input and is not part of the canonical schema.

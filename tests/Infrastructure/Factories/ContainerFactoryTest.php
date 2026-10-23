@@ -18,6 +18,7 @@ use Flexi\Infrastructure\Classes\InMemoryCache;
 use Flexi\Infrastructure\Classes\ObjectBuilder;
 use Flexi\Infrastructure\Classes\Configuration;
 use Flexi\Infrastructure\Classes\ConfigurationRepository;
+use Flexi\Infrastructure\Classes\ModuleDependencyValidator;
 use Flexi\Domain\Interfaces\ConfigurationFilesProviderInterface;
 use Flexi\Contracts\Interfaces\CacheInterface;
 use Flexi\Contracts\Interfaces\ObjectBuilderInterface;
@@ -74,6 +75,25 @@ class ContainerFactoryTest extends TestCase
         $container = $factory->getInstance();
 
         $this->assertInstanceOf(Container::class, $container);
+    }
+
+    public function testValidatesModuleDependenciesBeforeBuildingContainer(): void
+    {
+        $validator = $this->getMockBuilder(ModuleDependencyValidator::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $validator->expects($this->once())->method('validate');
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+
+        $factory = new ContainerFactory(
+            $this->cache,
+            $this->objectBuilder,
+            $this->servicesDefinitionParser,
+            $this->configFilesProvider,
+            $validator
+        );
+
+        $this->assertInstanceOf(Container::class, $factory->getInstance());
     }
 
     public function testGetInstanceWithFile(): void

@@ -65,7 +65,7 @@ with Docker, you can access the application at http://localhost:8080.
 
 ## Module Management
 
-Modules are discovered from the local `modules/` directory and Composer's installed packages. Each module declares its identity and configuration files in `extra.flexi` in its `composer.json`; only active modules contribute registrations. See [the module manifest](docs/module-manifest.md) and [module lifecycle](docs/module-lifecycle.md) for the current format and behavior.
+Modules are discovered from the local `modules/` directory and Composer's installed packages. Each module declares its identity and configuration files in `extra.flexi` in its `composer.json`; only active modules contribute registrations. Before the default container build, Flexi checks declared core compatibility, required active module dependencies, their version constraints, and circular dependencies. See [the module manifest](docs/module-manifest.md) and [module lifecycle](docs/module-lifecycle.md) for the current format and behavior.
 
 For example, a module can declare its routes and services like this:
 

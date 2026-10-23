@@ -20,6 +20,7 @@ use Flexi\Infrastructure\Classes\ConfigurationFilesProvider;
 use Flexi\Infrastructure\Classes\HybridModuleDetector;
 use Flexi\Infrastructure\Classes\LocalModuleDetector;
 use Flexi\Infrastructure\Classes\ModuleStateManager;
+use Flexi\Infrastructure\Classes\ModuleDependencyValidator;
 use Flexi\Infrastructure\Classes\VendorModuleDetector;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -30,17 +31,20 @@ class ContainerFactory
     private ObjectBuilderInterface $object_builder;
     private ServicesDefinitionParser $services_definition_parser;
     private ConfigurationFilesProviderInterface $config_files_provider;
+    private ?ModuleDependencyValidator $module_dependency_validator;
 
     public function __construct(
         CacheInterface $cache,
         ObjectBuilderInterface $object_builder,
         ServicesDefinitionParser $services_definition_parser,
-        ConfigurationFilesProviderInterface $config_files_provider
+        ConfigurationFilesProviderInterface $config_files_provider,
+        ?ModuleDependencyValidator $module_dependency_validator = null
     ) {
         $this->cache = $cache;
         $this->object_builder = $object_builder;
         $this->services_definition_parser = $services_definition_parser;
         $this->config_files_provider = $config_files_provider;
+        $this->module_dependency_validator = $module_dependency_validator;
     }
 
     /**
@@ -55,6 +59,10 @@ class ContainerFactory
      */
     public function getInstance(): Container
     {
+        if ($this->module_dependency_validator !== null) {
+            $this->module_dependency_validator->validate();
+        }
+
         $configurationValidator = new ConfigurationValidator();
         foreach ($this->config_files_provider->getAllConfigurationFiles() as $type => $files) {
             foreach ($files as $file) {
@@ -239,7 +247,26 @@ class ContainerFactory
         $objectBuilder = new ObjectBuilder($cache);
         $servicesDefinitionParser = new ServicesDefinitionParser($cache);
         $configFilesProvider = new ConfigurationFilesProvider($modulesStateManager, $moduleDetector);
+        $rootComposerFile = './composer.json';
+        $rootComposerData = is_file($rootComposerFile)
+            ? json_decode((string) file_get_contents($rootComposerFile), true)
+            : null;
+        $coreVersion = is_array($rootComposerData) && isset($rootComposerData['version'])
+            ? (string) $rootComposerData['version']
+            : '0.0.0';
+        $moduleDependencyValidator = new ModuleDependencyValidator(
+            $moduleDetector,
+            $modulesStateManager,
+            './',
+            $coreVersion
+        );
 
-        return (new self($cache, $objectBuilder, $servicesDefinitionParser, $configFilesProvider))->getInstance();
+        return (new self(
+            $cache,
+            $objectBuilder,
+            $servicesDefinitionParser,
+            $configFilesProvider,
+            $moduleDependencyValidator
+        ))->getInstance();
     }
 }

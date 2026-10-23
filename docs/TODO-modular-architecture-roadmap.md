@@ -74,7 +74,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Validate all active module files against the Contracts schemas before registering components; report module, file, JSON path, and validation cause.
 - [x] Detect duplicate service IDs, route names and method/path pairs, and handler IDs/aliases; fail explicitly instead of silently overwriting.
 - [x] Define a deliberate policy for service replacement/decoration and route overrides; require explicit declarations and reject ambiguous decoration chains.
-- [ ] Define and validate circular or incompatible dependencies between modules before building the application.
+- [x] Define and validate circular or incompatible dependencies between active modules before building the application. The core checks declared core compatibility, required module activation/version constraints, and dependency cycles; Composer remains responsible for resolving external packages.
 - [ ] Agree on a deterministic load order and priority resolution, and document it.
 
 **Acceptance:** invalid or ambiguous configuration fails at startup with actionable diagnostics; valid configuration produces the same registration log on each execution.
