@@ -1,5 +1,7 @@
 # Middleware Extraction Analysis
 
+> **Historical analysis:** The source paths and pending extraction decision below predate the current middleware pipeline. See [HTTP routing](http-routing.md) and [historical documentation](historical-documentation.md) for the current references.
+
 **Date:** October 27, 2025
 **Branch:** refactor-complete-psr-compatibility
 **Status:** 🔍 ANALYSIS IN PROGRESS

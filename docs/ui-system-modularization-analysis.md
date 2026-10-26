@@ -1,5 +1,7 @@
 # UI System Modularization Analysis
 
+> **Historical decision record:** This note's completion claim describes an earlier scope and does not represent all current UI code. See [historical documentation](historical-documentation.md) for current references.
+
 **Date:** October 27, 2025
 **Branch:** refactor-complete-psr-compatibility
 **Status:** ✅ **IMPLEMENTATION COMPLETE - 171/171 TESTS PASSING**
