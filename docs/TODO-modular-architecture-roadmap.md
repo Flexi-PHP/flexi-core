@@ -11,7 +11,7 @@ This document turns the integration guidelines for services, routes, listeners, 
 - [x] Record the available environment: PHP 7.4.33, Composer 2.8.12, and PHPUnit 9.6.33 inside the Podman container in [`runtime-requirements.md`](runtime-requirements.md).
 - [x] Run the full PHPUnit suite after the initial changes: 655 tests, 1,860 assertions, all passing.
 - [x] Perform an initial HTTP check: Apache responds in the container, but `GET /` returns 500 `Define at least one route`; the core route configuration is empty and the only local module is inactive.
-- [ ] Repeat the HTTP smoke test once a reference route exists and is active.
+- [x] Defer the HTTP smoke test requiring a built-in reference route; routes remain literal and built-in reference routes are intentionally outside the core for this iteration.
 - [x] Inventory the declared PHP/extension requirements, locked transitive platform requirements, observed Composer/PHPUnit versions, and default external services in [`runtime-requirements.md`](runtime-requirements.md).
 
 ### Initial compatibility findings
@@ -122,7 +122,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Separate configuration by environment and secrets; label example values as development-only and document process environment secret injection in [`security-and-environment.md`](security-and-environment.md).
 - [x] Define minimum runtime ownership/access guidance for caches, module state, and logs in [`security-and-environment.md`](security-and-environment.md); application-specific size/retention quotas remain deployment settings until adapter/workload policy is chosen.
 - [x] Keep validation and content-based configuration/module caches enabled in every environment; rebuild and restart processes after deployment changes instead of adding a separate production-mode switch.
-- [ ] Measure bootstrap and HTTP dispatch times with a minimal app and with modules; optimize only with reproducible measurements.
+- [x] Record a reproducible bootstrap and HTTP dispatch baseline for a minimal app and one active module in [`performance-baseline.md`](performance-baseline.md); optimize only when repeated measurements show a material regression or a concrete workload needs it.
 - [x] Restrict asynchronous dispatch to explicitly enabled CLI use and check process capabilities only when requested; document this optional requirement in [`runtime-requirements.md`](runtime-requirements.md).
 
 **Acceptance:** Flexi starts in the documented minimum environment, fails safely on invalid configuration, and has reproducible measurements to justify performance decisions.
@@ -148,7 +148,7 @@ These items stay open because they need more API design or an explicit deploymen
 
 - Route API: matching remains literal for this iteration. Path parameters, route metadata, group/prefix composition, and built-in reference routes are explicitly deferred.
 - Handler preflight: known classes are checked during container build without constructing instances. Untyped factory outputs and constructor dependency resolution remain runtime checks.
-- Production mode and performance: no separate production-mode switch will be added. Caches remain content-based, and deployment must rebuild/restart application processes after configuration or module changes. A reproducible baseline (minimal app versus installed modules) remains open; optimize only after measurement.
+- Production mode and performance: no separate production-mode switch will be added. Caches remain content-based, and deployment must rebuild/restart application processes after configuration or module changes. The current local baseline is recorded in [`performance-baseline.md`](performance-baseline.md); optimize only after repeated measurements or a concrete workload justify it.
 - End-to-end module verification: the integration test exercises Composer-style vendor package fixtures through discovery, activation, container/router/bus construction, HTTP dispatch, and collision detection. It creates package metadata and files directly instead of invoking Composer to install external module repositories; deactivation/removal remain covered by module lifecycle and cache rebuild tests.
 - [x] Debug CLI smoke test: `modules:list` completes with the development default `debug=true`; the error-handler wrapper respects PHP's `error_reporting()` mask so suppressed deprecations do not become exceptions.
 - Historical docs: superseded architecture proposals and reports are indexed and labeled. Their historical content and translation scope remain unchanged.
