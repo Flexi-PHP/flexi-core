@@ -21,4 +21,6 @@ Commands and queries have separate registries. Within each registry, the DTO/han
 
 Command and query handlers implement `Flexi\\Contracts\\Interfaces\\HandlerInterface`. Exceptions from handlers and their dependencies propagate to the caller; the buses do not convert or suppress them. Registrations from inactive modules are absent from the next bus build.
 
-The current bus factory detects duplicate IDs and aliases before the bus is returned. Handler class construction and dependency errors are currently raised when the handler is first executed. Whether the framework should eagerly construct handlers at startup is left open because constructors may have application-specific side effects.
+The container build performs constructor-free preflight checks for configured routes, middleware, listeners, commands, and queries. It resolves service aliases and class definitions, then checks that known classes are loadable, instantiable, and compatible with the required PSR or Flexi interface. It does not invoke constructors, so constructor side effects remain lazy until the handler is first used.
+
+For static service factories, a declared object return type is checked against the required interface. Factories without a named return type cannot be verified without executing them; their result is checked by the existing runtime `instanceof` guard when first resolved. Constructor dependency resolution errors are likewise reported on first use.

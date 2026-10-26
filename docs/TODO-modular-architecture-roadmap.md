@@ -93,7 +93,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 ## Block 4 — Routes and HTTP pipeline
 
 - [x] Document the current Contracts route schema: methods, literal paths, query/form parameters, names, controllers, middleware IDs, and explicit overrides in [`http-routing.md`](http-routing.md).
-- [ ] Decide whether to add parameterized path matching or arbitrary route metadata; defer schema changes until this API decision is reviewed.
+- [x] Keep path matching literal for this iteration; defer parameterized paths and arbitrary route metadata without changing the Contracts schema.
 - [x] Resolve route and method conflicts at startup, with the originating configuration file included in the error.
 - [ ] Define route composition by application, module, group, and individual route, including prefixes and ordering.
 - [x] Make the pipeline use PSR-7/PSR-15 consistently and ensure middleware application does not depend on the controller extending a concrete class.
@@ -109,7 +109,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Define registration contracts for listeners, commands, and queries, including the ID and handler class in [`message-handlers.md`](message-handlers.md) and the Contracts schemas.
 - [x] Establish listener ordering and tie-break rules: equal priority, then stable configuration/definition/listener registration order; specific event listeners precede wildcard listeners.
 - [x] Define handler cardinality: one command/query handler per ID, with unique aliases; multiple event listeners per event are allowed. Collisions fail with source files.
-- [ ] Verify listener/handler class and interface compatibility during build without constructing handlers/listeners; keep runtime instantiation lazy to avoid constructor side effects during validation.
+- [x] Verify known listener/handler classes and interface compatibility during container build without constructing handlers/listeners; keep runtime instantiation lazy to avoid constructor side effects during validation.
 - [x] Define error propagation and listener stop behavior: handler/listener exceptions propagate, and stopped events skip later listeners; see [`message-handlers.md`](message-handlers.md).
 - [x] Ensure that activating or deactivating a module adds or removes all its registrations in a clean rebuild; bus builds use the current configuration file set, covered by a regression test.
 
@@ -147,7 +147,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 These items stay open because they need more API design or an explicit deployment policy:
 
 - Route API: matching remains literal for this iteration. Path parameters and route metadata, group/prefix composition and ordering, and reference health/example routes remain open.
-- Handler preflight: validation will inspect handler/listener class and interface compatibility without constructing instances; runtime instantiation remains lazy. The implementation and full contract coverage remain open.
+- Handler preflight: known classes are checked during container build without constructing instances. Untyped factory outputs and constructor dependency resolution remain runtime checks.
 - Production mode and performance: caches remain content-based, and deployment must rebuild/restart application processes after configuration or module changes. A separate production-mode switch and a reproducible baseline (minimal app versus installed modules) remain open; optimize only after measurement.
 - End-to-end module verification: exercise real Composer-installed modules through discovery, activation, container/router/bus construction, HTTP dispatch, deactivation, and removal. Current tests cover schema, parsers, factories, and rebuild behavior at unit/factory boundaries.
 - [x] Debug CLI smoke test: `modules:list` completes with the development default `debug=true`; the error-handler wrapper respects PHP's `error_reporting()` mask so suppressed deprecations do not become exceptions.

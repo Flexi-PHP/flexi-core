@@ -63,8 +63,9 @@ class ContainerFactory
             $this->module_dependency_validator->validate();
         }
 
+        $configurationFiles = $this->config_files_provider->getAllConfigurationFiles();
         $configurationValidator = new ConfigurationValidator();
-        foreach ($this->config_files_provider->getAllConfigurationFiles() as $type => $files) {
+        foreach ($configurationFiles as $type => $files) {
             foreach ($files as $file) {
                 $configurationValidator->validateFile($type, $file);
             }
@@ -101,6 +102,8 @@ class ContainerFactory
         }
 
         $this->applyDecorators($definitions, $sources);
+        (new \Flexi\Infrastructure\DependencyInjection\HandlerDefinitionValidator())
+            ->validate($configurationFiles, $definitions);
 
         foreach ($definitions as $name => $service) {
             $container->set($name, $service, $sources[$name] ?? null);
