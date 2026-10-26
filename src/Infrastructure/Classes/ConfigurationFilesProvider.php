@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Flexi\Infrastructure\Classes;
 
-use Flexi\Domain\Interfaces\ConfigurationFilesProviderInterface;
+use Flexi\Domain\Interfaces\CandidateConfigurationFilesProviderInterface;
 use Flexi\Domain\Interfaces\ModuleStateManagerInterface;
 use Flexi\Infrastructure\Classes\HybridModuleDetector;
 use Flexi\Domain\ValueObjects\ModuleInfo;
@@ -14,7 +14,7 @@ use Flexi\Contracts\Classes\Traits\FileHandlerTrait;
 /**
  * Provides configuration files from active modules and core
  */
-class ConfigurationFilesProvider implements ConfigurationFilesProviderInterface
+class ConfigurationFilesProvider implements CandidateConfigurationFilesProviderInterface
 {
 
     use FileHandlerTrait;
@@ -40,6 +40,34 @@ class ConfigurationFilesProvider implements ConfigurationFilesProviderInterface
      */
     public function getConfigurationFiles(ConfigurationType $configType, bool $includeCoreConfig = true): array
     {
+        return $this->getConfigurationFilesForModules($configType, $includeCoreConfig, null);
+    }
+
+    /**
+     * Return configuration files as if a discovered module were active, without changing persisted state.
+     *
+     * @return array<string, string[]>
+     */
+    public function getAllConfigurationFilesIncluding(string $moduleName, bool $includeCoreConfig = true): array
+    {
+        $allFiles = [];
+        foreach (ConfigurationType::getAllTypes() as $configType) {
+            $type = new ConfigurationType($configType);
+            $allFiles[$configType] = $this->getConfigurationFilesForModules($type, $includeCoreConfig, $moduleName);
+        }
+
+        return $allFiles;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function getConfigurationFilesForModules(
+        ConfigurationType $configType,
+        bool $includeCoreConfig,
+        ?string $additionalActiveModule
+    ): array
+    {
         $files = [];
 
         // Add core configuration file if requested
@@ -51,7 +79,7 @@ class ConfigurationFilesProvider implements ConfigurationFilesProviderInterface
         }
 
         // Add active modules configuration files
-        $activeModules = $this->getActiveModules();
+        $activeModules = $this->getActiveModules($additionalActiveModule);
         foreach ($activeModules as $module) {
             $moduleConfigFile = $this->getModuleConfigurationFile($module->getName(), $configType);
             if ($moduleConfigFile && file_exists($moduleConfigFile)) {
@@ -184,13 +212,16 @@ class ConfigurationFilesProvider implements ConfigurationFilesProviderInterface
      *
      * @return ModuleInfo[] Array of active modules
      */
-    private function getActiveModules(): array
+    private function getActiveModules(?string $additionalActiveModule = null): array
     {
         $allModules = $this->moduleDetector->getAllModules();
         $activeModules = [];
 
         foreach ($allModules as $module) {
-            if ($this->moduleStateManager->isModuleActive($module->getName())) {
+            if (
+                $this->moduleStateManager->isModuleActive($module->getName())
+                || ($additionalActiveModule !== null && strcasecmp($module->getName(), $additionalActiveModule) === 0)
+            ) {
                 $activeModules[] = $module;
             }
         }

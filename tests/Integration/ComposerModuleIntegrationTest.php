@@ -23,6 +23,9 @@ use Flexi\Infrastructure\DependencyInjection\ServicesDefinitionParser;
 use Flexi\Infrastructure\Factories\BusFactory;
 use Flexi\Infrastructure\Factories\ContainerFactory;
 use Flexi\Infrastructure\Factories\RouterFactory;
+use Flexi\Application\Services\ModuleActivationPreflight;
+use Flexi\Application\Commands\ActivateModuleCommand;
+use Flexi\Application\UseCase\ActivateModule;
 use Flexi\Test\TestData\Commands\TestCommand;
 use Flexi\Test\TestData\Handlers\TestCommandHandler;
 use Flexi\Test\TestData\TestDoubles\TestHttpHandler;
@@ -38,6 +41,7 @@ final class ComposerModuleIntegrationTest extends TestCase
     private string $projectRoot;
     private string $originalWorkingDirectory;
     private ModuleStateManager $moduleStateManager;
+    private HybridModuleDetector $moduleDetector;
     private ConfigurationFilesProviderInterface $configurationFilesProvider;
     private CacheInterface $cache;
     private ObjectBuilder $objectBuilder;
@@ -55,6 +59,7 @@ final class ComposerModuleIntegrationTest extends TestCase
         }
         file_put_contents($this->projectRoot . '/composer.json', json_encode([
             'name' => 'flexi/integration-fixture',
+            'version' => '3.1.0',
             'extra' => ['flexi' => ['module-load-order' => ['Beta', 'Alpha']]],
         ], JSON_THROW_ON_ERROR));
         chdir($this->projectRoot);
@@ -64,13 +69,13 @@ final class ComposerModuleIntegrationTest extends TestCase
         $moduleCache = new ModuleCacheManager('./var', './');
         $localDetector = new LocalModuleDetector($moduleCache);
         $vendorDetector = new VendorModuleDetector($moduleCache, './vendor');
-        $moduleDetector = new HybridModuleDetector($localDetector, $vendorDetector);
+        $this->moduleDetector = new HybridModuleDetector($localDetector, $vendorDetector);
         $this->moduleStateManager = new ModuleStateManager(
             new ModuleStateRepository('./var/modules-state.json')
         );
         $this->configurationFilesProvider = new ConfigurationFilesProvider(
             $this->moduleStateManager,
-            $moduleDetector,
+            $this->moduleDetector,
             $this->projectRoot
         );
         $this->cache = new InMemoryCache();
@@ -148,6 +153,46 @@ final class ComposerModuleIntegrationTest extends TestCase
         BusFactory::createCommandBus($container);
     }
 
+    public function testActivationPreflightBuildsCandidateConfigurationWithoutPersistingActivation(): void
+    {
+        $module = $this->moduleDetector->getModuleInfo('Alpha');
+        self::assertNotNull($module);
+
+        $preflight = new ModuleActivationPreflight(
+            $this->cache,
+            $this->objectBuilder,
+            $this->servicesParser,
+            $this->configurationFilesProvider,
+            $this->moduleDetector,
+            $this->moduleStateManager
+        );
+        $preflight->validate($module);
+
+        $this->assertFalse($this->moduleStateManager->isModuleActive('Alpha'));
+
+        $this->moduleStateManager->activateModule('Beta');
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Handler ID "' . TestCommand::class . '" is defined in both');
+        $preflight->validate($module);
+    }
+
+    public function testActivationUseCaseRunsPreflightAndDispatchesCacheInvalidationEvent(): void
+    {
+        $cacheFile = $this->projectRoot . '/var/modules-cache.json';
+        file_put_contents($cacheFile, '{}');
+        $container = $this->buildContainer();
+        /** @var ActivateModule $activateModule */
+        $activateModule = $container->get(ActivateModule::class);
+
+        $result = $activateModule->handle(new ActivateModuleCommand(['module_name' => 'Alpha']));
+        $payload = json_decode($result->get('body'), true);
+
+        $this->assertTrue($payload['success']);
+        $freshStateManager = new ModuleStateManager(new ModuleStateRepository('./var/modules-state.json'));
+        $this->assertTrue($freshStateManager->isModuleActive('Alpha'));
+        $this->assertFileDoesNotExist($cacheFile);
+    }
+
     private function buildContainer(): ContainerInterface
     {
         return (new ContainerFactory(
@@ -169,8 +214,11 @@ final class ComposerModuleIntegrationTest extends TestCase
             'name' => $packageName,
             'version' => '1.0.0',
             'type' => 'flexi-module',
+            'require' => ['php' => '>=7.4'],
             'extra' => ['flexi' => [
+                'schema-version' => 1,
                 'module-name' => $moduleName,
+                'compatibility' => ['core' => '^3.0'],
                 'config-files' => [
                     'config/services.json',
                     'config/routes.json',
@@ -178,6 +226,7 @@ final class ComposerModuleIntegrationTest extends TestCase
                     'config/commands.json',
                     'config/queries.json',
                 ],
+                'provides' => [],
             ]],
         ], JSON_THROW_ON_ERROR));
 

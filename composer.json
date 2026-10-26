@@ -61,6 +61,9 @@
     "post-install-cmd": [
       "@modules:list"
     ],
+    "post-update-cmd": [
+      "@modules:list"
+    ],
     "update-framework": [
       "upgrader upgrade-safely"
     ],

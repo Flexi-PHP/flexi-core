@@ -6,6 +6,9 @@ namespace Flexi\Application\UseCase;
 
 use Flexi\Domain\Interfaces\ModuleStateManagerInterface;
 use Flexi\Domain\Interfaces\ModuleEnvironmentManagerInterface;
+use Flexi\Application\Services\ModuleActivationPreflightInterface;
+use Flexi\Domain\Events\ModuleActivatedEvent;
+use Flexi\Contracts\Interfaces\EventBusInterface;
 use Flexi\Infrastructure\Classes\HybridModuleDetector;
 use Flexi\Contracts\Classes\PlainTextMessage;
 use Flexi\Contracts\Interfaces\DTOInterface;
@@ -23,15 +26,21 @@ class ActivateModule implements HandlerInterface
     private ModuleStateManagerInterface $stateManager;
     private HybridModuleDetector $moduleDetector;
     private ModuleEnvironmentManagerInterface $envManager;
+    private ModuleActivationPreflightInterface $preflight;
+    private EventBusInterface $eventBus;
 
     public function __construct(
         ModuleStateManagerInterface $stateManager,
         HybridModuleDetector $moduleDetector,
-        ModuleEnvironmentManagerInterface $envManager
+        ModuleEnvironmentManagerInterface $envManager,
+        ModuleActivationPreflightInterface $preflight,
+        EventBusInterface $eventBus
     ) {
         $this->stateManager = $stateManager;
         $this->moduleDetector = $moduleDetector;
         $this->envManager = $envManager;
+        $this->preflight = $preflight;
+        $this->eventBus = $eventBus;
     }
 
     /**
@@ -72,6 +81,28 @@ class ActivateModule implements HandlerInterface
                 'module' => $moduleName,
                 'status' => 'already_active'
             ]));
+        }
+
+        try {
+            $this->preflight->validate($moduleInfo);
+        } catch (\Throwable $exception) {
+            return new PlainTextMessage(json_encode([
+                'success' => false,
+                'error' => "Module '{$moduleName}' failed activation preflight: " . $exception->getMessage(),
+                'module' => $moduleName,
+                'status' => 'preflight_failed'
+            ], JSON_PRETTY_PRINT));
+        }
+
+        if (
+            $this->stateManager->getModuleState($moduleName) === null
+            && !$this->stateManager->initializeModuleState($moduleName, $moduleInfo->getType(), false, $modifiedBy)
+        ) {
+            return new PlainTextMessage(json_encode([
+                'success' => false,
+                'error' => "Failed to initialize inactive state for module '{$moduleName}'",
+                'module' => $moduleName
+            ], JSON_PRETTY_PRINT));
         }
 
         // Initialize module state if it doesn't exist, or just activate it
@@ -128,6 +159,12 @@ class ActivateModule implements HandlerInterface
         // Add environment warnings if any
         if (!empty($envWarnings)) {
             $response['env_warnings'] = $envWarnings;
+        }
+
+        try {
+            $this->eventBus->dispatch(new ModuleActivatedEvent($moduleInfo, $modifiedBy));
+        } catch (\Throwable $exception) {
+            $response['event_warnings'][] = 'Activation succeeded, but a lifecycle listener failed: ' . $exception->getMessage();
         }
 
         // Add conflict warning if applicable

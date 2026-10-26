@@ -37,6 +37,7 @@ class ListModules implements HandlerInterface
     public function handle(DTOInterface $dto): MessageInterface
     {
         $allModules = $this->moduleDetector->getAllModules();
+        $this->stateManager->syncWithDiscoveredModules($allModules);
         // Get module statistics if available (some detectors may not implement this)
         $moduleStats = method_exists($this->moduleDetector, 'getModuleStatistics')
             ? $this->moduleDetector->getModuleStatistics()

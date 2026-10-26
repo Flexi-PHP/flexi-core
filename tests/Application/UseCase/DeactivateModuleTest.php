@@ -6,6 +6,8 @@ namespace Flexi\Test\Application\UseCase;
 
 use Flexi\Application\Commands\DeactivateModuleCommand;
 use Flexi\Application\UseCase\DeactivateModule;
+use Flexi\Contracts\Interfaces\EventBusInterface;
+use Flexi\Domain\Events\ModuleDeactivatedEvent;
 use Flexi\Domain\ValueObjects\ModuleInfo;
 use Flexi\Domain\ValueObjects\ModuleState;
 use Flexi\Domain\ValueObjects\ModuleType;
@@ -24,6 +26,8 @@ class DeactivateModuleTest extends TestCase
     private $moduleDetector;
     /** @var ModuleEnvironmentManagerInterface&MockObject */
     private $envManager;
+    /** @var EventBusInterface&MockObject */
+    private $eventBus;
     private DeactivateModule $useCase;
 
     protected function setUp(): void
@@ -33,8 +37,12 @@ class DeactivateModuleTest extends TestCase
         $this->stateManager = $this->createMock(ModuleStateManagerInterface::class);
         $this->moduleDetector = $this->createMock(HybridModuleDetector::class);
         $this->envManager = $this->createMock(ModuleEnvironmentManagerInterface::class);
+        $this->eventBus = $this->createMock(EventBusInterface::class);
+        $this->eventBus->method('dispatch')->willReturnCallback(static function ($event) {
+            return $event;
+        });
 
-        $this->useCase = new DeactivateModule($this->stateManager, $this->moduleDetector, $this->envManager);
+        $this->useCase = new DeactivateModule($this->stateManager, $this->moduleDetector, $this->envManager, $this->eventBus);
     }
 
     public function testHandleFailsWhenModuleNameMissing(): void
@@ -113,6 +121,9 @@ class DeactivateModuleTest extends TestCase
         $this->moduleDetector->method('getModuleInfo')->willReturn($moduleInfo);
         $this->stateManager->method('isModuleActive')->willReturn(true);
         $this->stateManager->expects($this->once())->method('deactivateModule')->with('catalog', 'tester')->willReturn(true);
+        $this->eventBus->expects($this->once())->method('dispatch')->with($this->isInstanceOf(ModuleDeactivatedEvent::class))->willReturnCallback(static function ($event) {
+            return $event;
+        });
         $this->stateManager->method('getModuleState')->willReturn($state);
 
         $this->envManager

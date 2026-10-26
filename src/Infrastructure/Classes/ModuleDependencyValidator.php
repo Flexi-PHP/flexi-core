@@ -32,7 +32,7 @@ class ModuleDependencyValidator
     /**
      * @throws \RuntimeException When active modules have incompatible or circular requirements.
      */
-    public function validate(): void
+    public function validate(array $additionalActiveModuleNames = []): void
     {
         $modules = $this->moduleDetector->getAllModules();
         $modulesByPackage = [];
@@ -40,7 +40,10 @@ class ModuleDependencyValidator
 
         foreach ($modules as $module) {
             $modulesByPackage[strtolower($module->getPackage())] = $module;
-            if ($this->moduleStateManager->isModuleActive($module->getName())) {
+            if (
+                $this->moduleStateManager->isModuleActive($module->getName())
+                || in_array(strtolower($module->getName()), array_map('strtolower', $additionalActiveModuleNames), true)
+            ) {
                 $activeModules[$module->getName()] = $module;
             }
         }
