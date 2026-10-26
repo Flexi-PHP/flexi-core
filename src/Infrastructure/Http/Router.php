@@ -85,13 +85,12 @@ class Router
         $request_path = $request->getUri()->getPath();
         $event = new Event('core.onRequest', __CLASS__, ['request' => $request->getUri()->__toString()]);
         $this->event_bus->dispatch($event);
-        $this->assertThatRouteCollectionIsNotEmpty();
 
         $requestMethod = $request->getMethod();
         $methodKey = $this->getPathKey($request_path, $requestMethod);
         if (!$this->routes_indexed_by_path->offsetExists($methodKey)) {
             if ($this->hasPath($request_path)) {
-                throw new \RuntimeException(sprintf('Method %s is not allowed for this route', $requestMethod));
+                return $this->createMethodNotAllowedResponse($request_path);
             }
             return $this->handleNotFound($request, $request_path);
         }
@@ -117,11 +116,21 @@ class Router
         return false;
     }
 
-    private function assertThatRouteCollectionIsNotEmpty(): void
+    private function createMethodNotAllowedResponse(string $path, ?string $fallbackMethod = null): ResponseInterface
     {
-        if (!$this->routes_indexed_by_path->count()) {
-            throw new \RuntimeException('Define at least one route');
+        $allowedMethods = [];
+        foreach ($this->routes_indexed_by_path as $route) {
+            if ($route->getPath() === $path) {
+                $allowedMethods[] = $route->getMethod();
+            }
         }
+        if (!$allowedMethods && $fallbackMethod !== null) {
+            $allowedMethods[] = $fallbackMethod;
+        }
+
+        return $this->response_factory
+            ->createResponse(405)
+            ->withHeader('Allow', implode(', ', $allowedMethods));
     }
 
     public function handleNotFound(
@@ -176,8 +185,12 @@ class Router
         Route $route,
         ?string $requestMethod = null
     ): ResponseInterface {
-        $this->assertMethodIsAllowedForRoute($request, $route, $requestMethod);
-        $this->checkRequiredParamsWereSend($route);
+        if (!$this->assertMethodIsAllowedForRoute($request, $route, $requestMethod)) {
+            return $this->createMethodNotAllowedResponse($route->getPath(), $route->getMethod());
+        }
+        if (!$this->checkRequiredParamsWereSend($route)) {
+            return $this->response_factory->createResponse(400);
+        }
 
         $response = $this->executeStack($route, $request);
 
@@ -191,14 +204,12 @@ class Router
         ServerRequestInterface $request,
         Route $route,
         ?string $requestMethod = null
-    ): void {
+    ): bool {
         $requestMethod = $requestMethod ?? $request->getMethod();
-        if ($requestMethod !== $route->getMethod()) {
-            throw new \RuntimeException("Method {$requestMethod} is not allowed for this route");
-        }
+        return $requestMethod === $route->getMethod();
     }
 
-    protected function checkRequiredParamsWereSend(Route $route): void
+    protected function checkRequiredParamsWereSend(Route $route): bool
     {
         if ($route->hasParameters()) {
             foreach ($route->getParameters() as $parameter) {
@@ -207,10 +218,12 @@ class Router
                     && (!isset($_GET[$parameter['name']])
                         && !isset($_POST[$parameter['name']]))
                 ) {
-                    throw new \RuntimeException("Parameter '{$parameter['name']}' is required");
+                    return false;
                 }
             }
         }
+
+        return true;
     }
 
     /**

@@ -99,7 +99,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Make the pipeline use PSR-7/PSR-15 consistently and ensure middleware application does not depend on the controller extending a concrete class.
 - [x] Resolve middleware via IDs/definitions from the container while respecting aliases, factories, and dependency injection.
 - [x] Define middleware precedence, short-circuiting, and error propagation; test order and response when one stops the chain in [`http-routing.md`](http-routing.md).
-- [ ] Specify the expected HTTP behavior for missing routes, disallowed methods, invalid parameters, and exceptions.
+- [x] Specify and implement HTTP behavior: empty/unknown route returns 404 (with `RouteNotFoundEvent`); method mismatch returns 405 with `Allow`; missing required query/form parameters return 400; unexpected web exceptions return a generic 500 in production and include the message only in debug mode.
 - [ ] Create reference routes (health check and example route) that demonstrate the contract without coupling business logic to the core.
 
 **Acceptance:** routes from an active module work with the registered middlewares; when disabled, they disappear; invalid configuration and collisions are detected before serving requests.
@@ -109,7 +109,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Define registration contracts for listeners, commands, and queries, including the ID and handler class in [`message-handlers.md`](message-handlers.md) and the Contracts schemas.
 - [x] Establish listener ordering and tie-break rules: equal priority, then stable configuration/definition/listener registration order; specific event listeners precede wildcard listeners.
 - [x] Define handler cardinality: one command/query handler per ID, with unique aliases; multiple event listeners per event are allowed. Collisions fail with source files.
-- [ ] Verify that each listener/handler is instantiable by the container and compatible with its contract before accepting traffic/work. Eager construction is deferred pending agreement about constructor side effects.
+- [ ] Verify listener/handler class and interface compatibility during build without constructing handlers/listeners; keep runtime instantiation lazy to avoid constructor side effects during validation.
 - [x] Define error propagation and listener stop behavior: handler/listener exceptions propagate, and stopped events skip later listeners; see [`message-handlers.md`](message-handlers.md).
 - [x] Ensure that activating or deactivating a module adds or removes all its registrations in a clean rebuild; bus builds use the current configuration file set, covered by a regression test.
 
@@ -130,7 +130,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 ## Block 7 — Verification and developer guidance
 
 - [x] Cover schemas for services, routes, listeners, commands, and queries and activation/deactivation registration rebuilds in `ConfigurationValidatorTest`, parser/factory tests, and module activation tests.
-- [ ] Test HTTP routes and middlewares with the Docker stack, verifying status codes, headers, order, and errors.
+- [x] Test HTTP routing and middleware behavior in the container, including status codes, the 405 `Allow` header, and an empty-route 404 response.
 - [x] Test duplicate service IDs, handler IDs/aliases, and route names across multiple configuration files at their factory boundaries in `ContainerFactoryTest`, `BusFactoryTest`, and `RouterFactoryTest`.
 - [ ] Exercise full resolution and collisions across independently installed Composer modules, including event listeners and route method/path pairs.
 - [x] Test cache hit/miss behavior and Composer lock, module manifest, module membership, and configuration content changes in `ModuleCacheManagerTest`, parser tests, and cache invalidation tests.
@@ -144,13 +144,13 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 ## Deferred decisions and verification
 
-These items stay open because they change observable contracts or need an explicit deployment policy:
+These items stay open because they need more API design or an explicit deployment policy:
 
-- Route API and HTTP outcomes: path parameters and route metadata; group/prefix composition and ordering; behavior for an empty route table, 404, method mismatch, invalid input, and exceptions; and reference health/example routes.
-- Handler preflight: decide whether startup may construct handlers/listeners and trigger user-defined constructor side effects, or whether validation remains lazy.
-- Production mode and performance: define environment selection, cache artifact lifetime/invalidation, process rebuild expectations, and a reproducible baseline (minimal app versus installed modules) before implementing production-specific behavior or optimizing.
+- Route API: matching remains literal for this iteration. Path parameters and route metadata, group/prefix composition and ordering, and reference health/example routes remain open.
+- Handler preflight: validation will inspect handler/listener class and interface compatibility without constructing instances; runtime instantiation remains lazy. The implementation and full contract coverage remain open.
+- Production mode and performance: caches remain content-based, and deployment must rebuild/restart application processes after configuration or module changes. A separate production-mode switch and a reproducible baseline (minimal app versus installed modules) remain open; optimize only after measurement.
 - End-to-end module verification: exercise real Composer-installed modules through discovery, activation, container/router/bus construction, HTTP dispatch, deactivation, and removal. Current tests cover schema, parsers, factories, and rebuild behavior at unit/factory boundaries.
-- Debug CLI smoke test: in the current PHP 7.4.33 container, `modules:list` completes with `debug=false`, but with the development default `debug=true` Symfony's debug class loader promotes an Opis `UnicodeString::offsetSet()` return-type deprecation to an exception during service configuration validation. Decide the supported deprecation policy or dependency compatibility fix before calling the CLI smoke test complete.
+- [x] Debug CLI smoke test: `modules:list` completes with the development default `debug=true`; the error-handler wrapper respects PHP's `error_reporting()` mask so suppressed deprecations do not become exceptions.
 - Historical docs: audit older proposals and examples before marking them deprecated; their intended archival status and translation scope need review.
 
 ## Progress rule

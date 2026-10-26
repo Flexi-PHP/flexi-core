@@ -10,10 +10,10 @@ use Flexi\Infrastructure\Bus\QueryBus;
 use Flexi\Infrastructure\Classes\Configuration;
 use Flexi\Infrastructure\Classes\ConfigurationRepository;
 use Flexi\Infrastructure\Factories\ContainerFactory;
+use Flexi\Infrastructure\ErrorHandling\ErrorHandlerCall;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Symfony\Component\ErrorHandler\Debug;
-use Symfony\Component\ErrorHandler\ErrorHandler;
 
 class ConsoleApplication
 {
@@ -40,7 +40,7 @@ class ConsoleApplication
         error_reporting(E_ALL & ~E_USER_DEPRECATED);
 
         try {
-            echo ErrorHandler::call(static function () use ($argv, $debugMode) {
+            echo ErrorHandlerCall::run(static function () use ($argv, $debugMode) {
                 return self::handle( $argv, $debugMode);
             });
         } catch (\Throwable $e) {

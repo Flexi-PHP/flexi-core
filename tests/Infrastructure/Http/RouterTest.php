@@ -137,10 +137,11 @@ class RouterTest extends TestCase
         $uriInterfaceMock->expects($this->once())
             ->method('getPath')->willReturn(self::ROUTE_PATH);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Define at least one route');
+        $serverRequestMock->expects($this->once())->method('getMethod')->willReturn('GET');
+        $response = $this->createMock(ResponseInterface::class);
+        $this->response_factory->expects($this->once())->method('createResponse')->with(404)->willReturn($response);
 
-        $emptyRouter->dispatch($serverRequestMock);
+        $this->assertSame($response, $emptyRouter->dispatch($serverRequestMock));
     }
 
     /**
@@ -181,10 +182,10 @@ class RouterTest extends TestCase
         $serverRequestMock->expects($this->once())
             ->method('getMethod')->willReturn('GET');
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Parameter '{$requiredParam}' is required");
+        $response = $this->createMock(ResponseInterface::class);
+        $this->response_factory->expects($this->once())->method('createResponse')->with(400)->willReturn($response);
 
-        $this->router->dispatch($serverRequestMock);
+        $this->assertSame($response, $this->router->dispatch($serverRequestMock));
     }
 
     /**
@@ -211,10 +212,11 @@ class RouterTest extends TestCase
         $serverRequestMock->expects($this->once())
             ->method('getMethod')->willReturn($invalidMethod);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Method $invalidMethod is not allowed for this route");
+        $response = $this->createMock(ResponseInterface::class);
+        $response->expects($this->once())->method('withHeader')->with('Allow', 'GET')->willReturnSelf();
+        $this->response_factory->expects($this->once())->method('createResponse')->with(405)->willReturn($response);
 
-        $this->router->dispatch($serverRequestMock);
+        $this->assertSame($response, $this->router->dispatch($serverRequestMock));
     }
 
     /**
@@ -741,13 +743,14 @@ class RouterTest extends TestCase
         $serverRequestMock = $this->createMock(ServerRequestInterface::class);
         $serverRequestMock->method('getMethod')->willReturn('GET'); // Wrong method
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Method GET is not allowed for this route');
+        $response = $this->createMock(ResponseInterface::class);
+        $response->expects($this->once())->method('withHeader')->with('Allow', 'PUT')->willReturnSelf();
+        $this->response_factory->expects($this->once())->method('createResponse')->with(405)->willReturn($response);
 
         $reflection = new \ReflectionClass($this->router);
         $method = $reflection->getMethod('processRequest');
         $method->setAccessible(true);
-        $method->invoke($this->router, $serverRequestMock, $route);
+        $this->assertSame($response, $method->invoke($this->router, $serverRequestMock, $route));
     }
 
     /**
@@ -766,13 +769,13 @@ class RouterTest extends TestCase
         $serverRequestMock = $this->createMock(ServerRequestInterface::class);
         $serverRequestMock->method('getMethod')->willReturn('GET');
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Parameter 'required_param' is required");
+        $response = $this->createMock(ResponseInterface::class);
+        $this->response_factory->expects($this->once())->method('createResponse')->with(400)->willReturn($response);
 
         $reflection = new \ReflectionClass($this->router);
         $method = $reflection->getMethod('processRequest');
         $method->setAccessible(true);
-        $method->invoke($this->router, $serverRequestMock, $route);
+        $this->assertSame($response, $method->invoke($this->router, $serverRequestMock, $route));
     }
 
     /**
@@ -812,21 +815,14 @@ class RouterTest extends TestCase
      * Tests assertThatRouteCollectionIsNotEmpty method
      * @throws \ReflectionException
      */
-    public function testAssertThatRouteCollectionIsNotEmpty(): void
+    public function testEmptyRouteTableIsAllowed(): void
     {
         // Create a router without routes
         $emptyRouter = new Router(
             $this->event_bus, $this->class_factory, $this->response_factory, $this->container
         );
 
-        $reflection = new \ReflectionClass($emptyRouter);
-        $method = $reflection->getMethod('assertThatRouteCollectionIsNotEmpty');
-        $method->setAccessible(true);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Define at least one route');
-
-        $method->invoke($emptyRouter);
+        $this->assertInstanceOf(Router::class, $emptyRouter);
     }
 
     /**

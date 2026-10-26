@@ -8,8 +8,10 @@ The machine-readable route definition is owned by the [`flexi/contracts` routes 
 - `controller` resolves to a PSR-15 `RequestHandlerInterface`. It does not need to extend Flexi's `HttpHandler` base class.
 - Each `middlewares` string is resolved through the PSR-11 container. The resolved object must implement PSR-15 `MiddlewareInterface`; aliases and factories can be registered in `services.json`.
 - Middleware runs in the array's declared order, with the first entry outermost. A middleware can short-circuit by returning a response without calling its next handler. Exceptions propagate through the chain to the application error handler.
-- A request for an unknown path dispatches `RouteNotFoundEvent`; when no listener provides a response, the router returns a simple 404 response. If there are no registered routes at all, dispatch currently throws `Define at least one route` before the 404 flow.
-- A method mismatch and a missing required query/form parameter currently raise `RuntimeException`. The router does not yet translate those cases into an HTTP 405 or 400 response.
+- A request for an unknown path dispatches `RouteNotFoundEvent`; when no listener provides a response, the router returns a simple 404 response. An empty route table follows the same flow, so an application with no routes returns 404.
+- If a path exists but the request method does not match, the router returns 405 and an `Allow` header listing the methods registered for that path.
+- A missing required query/form parameter returns 400. Parameter presence is checked against PHP's `$_GET` and `$_POST` superglobals, as defined by the current route contract.
+- Unexpected exceptions during web request handling produce a 500 response. Production mode returns a generic message; debug mode includes the exception message to aid local development. Exceptions are not exposed in the production response body.
 
 ## Configuration example
 
@@ -37,4 +39,4 @@ Route overrides keep the existing route name and declare that name in `overrides
 
 ## Deferred route design
 
-Parameterized path matching and arbitrary route metadata are not part of the current Contracts schema or router behavior. Whether to add those capabilities is an API design decision and remains open. Route grouping and prefix composition across application, module, and individual route levels also remain open until their precedence is agreed.
+Parameterized path matching and arbitrary route metadata are not part of the current Contracts schema or router behavior. Path matching remains literal for this roadmap iteration. Route grouping and prefix composition across application, module, and individual route levels remain deferred until their precedence is agreed.
