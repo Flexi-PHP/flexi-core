@@ -1,6 +1,6 @@
 # Runtime Requirements
 
-Flexi Core declares PHP `>=7.4` and `ext-json` as required Composer platform packages. The exact transitive extension requirements come from the packages pinned in `composer.lock`; inspect them with `composer check-platform-reqs` for the selected PHP runtime.
+Flexi Core's declared compatibility floor is PHP `>=7.4`, with `ext-json` as a required Composer platform package. This is the framework's compatibility promise, not a claim that every accepted PHP release still receives security fixes from PHP upstream. The exact transitive extension requirements come from the packages pinned in `composer.lock`; inspect them with `composer check-platform-reqs` for the selected PHP runtime.
 
 ## Verified development container
 

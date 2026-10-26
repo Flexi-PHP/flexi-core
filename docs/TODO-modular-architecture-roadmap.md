@@ -95,12 +95,12 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Document the current Contracts route schema: methods, literal paths, query/form parameters, names, controllers, middleware IDs, and explicit overrides in [`http-routing.md`](http-routing.md).
 - [x] Keep path matching literal for this iteration; defer parameterized paths and arbitrary route metadata without changing the Contracts schema.
 - [x] Resolve route and method conflicts at startup, with the originating configuration file included in the error.
-- [ ] Define route composition by application, module, group, and individual route, including prefixes and ordering.
+- [x] Defer route groups and prefix composition; keep route matching literal until a concrete use case establishes precedence requirements.
 - [x] Make the pipeline use PSR-7/PSR-15 consistently and ensure middleware application does not depend on the controller extending a concrete class.
 - [x] Resolve middleware via IDs/definitions from the container while respecting aliases, factories, and dependency injection.
 - [x] Define middleware precedence, short-circuiting, and error propagation; test order and response when one stops the chain in [`http-routing.md`](http-routing.md).
 - [x] Specify and implement HTTP behavior: empty/unknown route returns 404 (with `RouteNotFoundEvent`); method mismatch returns 405 with `Allow`; missing required query/form parameters return 400; unexpected web exceptions return a generic 500 in production and include the message only in debug mode.
-- [ ] Create reference routes (health check and example route) that demonstrate the contract without coupling business logic to the core.
+- [x] Defer built-in reference routes; health checks and examples belong to an optional module or application until their ownership and response contract are needed.
 
 **Acceptance:** routes from an active module work with the registered middlewares; when disabled, they disappear; invalid configuration and collisions are detected before serving requests.
 
@@ -121,7 +121,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Document the trust model: a Composer package executes PHP code and functional deactivation is not security isolation in [`security-and-environment.md`](security-and-environment.md).
 - [x] Separate configuration by environment and secrets; label example values as development-only and document process environment secret injection in [`security-and-environment.md`](security-and-environment.md).
 - [x] Define minimum runtime ownership/access guidance for caches, module state, and logs in [`security-and-environment.md`](security-and-environment.md); application-specific size/retention quotas remain deployment settings until adapter/workload policy is chosen.
-- [ ] Establish a production mode with validated and cached configuration plus explicit invalidation/rebuild during deployment.
+- [x] Keep validation and content-based configuration/module caches enabled in every environment; rebuild and restart processes after deployment changes instead of adding a separate production-mode switch.
 - [ ] Measure bootstrap and HTTP dispatch times with a minimal app and with modules; optimize only with reproducible measurements.
 - [x] Restrict asynchronous dispatch to explicitly enabled CLI use and check process capabilities only when requested; document this optional requirement in [`runtime-requirements.md`](runtime-requirements.md).
 
@@ -132,13 +132,13 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Cover schemas for services, routes, listeners, commands, and queries and activation/deactivation registration rebuilds in `ConfigurationValidatorTest`, parser/factory tests, and module activation tests.
 - [x] Test HTTP routing and middleware behavior in the container, including status codes, the 405 `Allow` header, and an empty-route 404 response.
 - [x] Test duplicate service IDs, handler IDs/aliases, and route names across multiple configuration files at their factory boundaries in `ContainerFactoryTest`, `BusFactoryTest`, and `RouterFactoryTest`.
-- [ ] Exercise full resolution and collisions across independently installed Composer modules, including event listeners and route method/path pairs.
+- [x] Exercise resolution and collisions across independently installed Composer-style package fixtures, including activation, services, route/middleware dispatch, commands, listeners, and route/handler conflicts.
 - [x] Test cache hit/miss behavior and Composer lock, module manifest, module membership, and configuration content changes in `ModuleCacheManagerTest`, parser tests, and cache invalidation tests.
 - [x] Add a minimal module template with a route, service, middleware, and optional listener in [`module-template.md`](module-template.md).
 - [x] Document atomic recipes for install/activate, add a capability, replace an adapter, deactivate, and remove in [`module-recipes.md`](module-recipes.md).
 - [x] Align the main README's installation, middleware, and module-guide examples with current behavior.
-- [ ] Audit historical documentation and examples against current behavior; mark obsolete proposals as deprecated.
-- [ ] Define CI for static validation, unit tests, integration tests, and compatibility with supported versions.
+- [x] Inventory historical architecture documents, mark superseded proposals/reports, and add a central index linking current references in [`historical-documentation.md`](historical-documentation.md). Historical example code remains preserved as archival material.
+- [x] Define CI for Composer metadata validation, PHP syntax lint, unit/integration tests, and compatibility with the declared PHP `>=7.4` floor; run checks on pushes and pull requests to `main` and `develop`.
 
 **Acceptance:** a new developer can follow the template to add and remove a capability without editing core internals; CI reproduces the documented checks.
 
@@ -146,12 +146,12 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 These items stay open because they need more API design or an explicit deployment policy:
 
-- Route API: matching remains literal for this iteration. Path parameters and route metadata, group/prefix composition and ordering, and reference health/example routes remain open.
+- Route API: matching remains literal for this iteration. Path parameters, route metadata, group/prefix composition, and built-in reference routes are explicitly deferred.
 - Handler preflight: known classes are checked during container build without constructing instances. Untyped factory outputs and constructor dependency resolution remain runtime checks.
-- Production mode and performance: caches remain content-based, and deployment must rebuild/restart application processes after configuration or module changes. A separate production-mode switch and a reproducible baseline (minimal app versus installed modules) remain open; optimize only after measurement.
-- End-to-end module verification: exercise real Composer-installed modules through discovery, activation, container/router/bus construction, HTTP dispatch, deactivation, and removal. Current tests cover schema, parsers, factories, and rebuild behavior at unit/factory boundaries.
+- Production mode and performance: no separate production-mode switch will be added. Caches remain content-based, and deployment must rebuild/restart application processes after configuration or module changes. A reproducible baseline (minimal app versus installed modules) remains open; optimize only after measurement.
+- End-to-end module verification: the integration test exercises Composer-style vendor package fixtures through discovery, activation, container/router/bus construction, HTTP dispatch, and collision detection. It creates package metadata and files directly instead of invoking Composer to install external module repositories; deactivation/removal remain covered by module lifecycle and cache rebuild tests.
 - [x] Debug CLI smoke test: `modules:list` completes with the development default `debug=true`; the error-handler wrapper respects PHP's `error_reporting()` mask so suppressed deprecations do not become exceptions.
-- Historical docs: audit older proposals and examples before marking them deprecated; their intended archival status and translation scope need review.
+- Historical docs: superseded architecture proposals and reports are indexed and labeled. Their historical content and translation scope remain unchanged.
 
 ## Progress rule
 
