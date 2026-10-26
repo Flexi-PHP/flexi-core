@@ -61,7 +61,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Use relative paths declared in `extra.flexi.config-files`; keep `Config/<type>.json` as a fallback for older modules without a list.
 - [x] Omit a configuration type if an explicit list does not declare it.
 - [x] Mark conflicting legacy module guides as historical references and link the canonical manifest specification.
-- [ ] Align `modules/example-auth` with manifest schema v1 after core/contracts stabilization; module files are excluded from this repository by `.gitignore` and module migration is deferred by scope.
+- [x] Keep the extracted `example-auth` module out of the core repository; its remaining ignored local files are migration residue, not a core module to maintain.
 - [x] Define the lifecycle explicitly: discovered, validated, dependencies resolved, active, registered, and inactive in [`module-lifecycle.md`](module-lifecycle.md).
 - [x] Define deactivation's observable effect: inactive modules contribute no services, routes, listeners, commands, or queries after the next application build.
 - [x] Require explicit activation: newly discovered modules initialize as inactive.
@@ -93,7 +93,7 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 ## Block 4 — Routes and HTTP pipeline
 
 - [x] Document the current Contracts route schema: methods, literal paths, query/form parameters, names, controllers, middleware IDs, and explicit overrides in [`http-routing.md`](http-routing.md).
-- [x] Keep path matching literal for this iteration; defer parameterized paths and arbitrary route metadata without changing the Contracts schema.
+- [x] Adopt literal route paths as the stable routing policy: route identity and collisions use the literal path plus HTTP method; request values use query/form parameters.
 - [x] Resolve route and method conflicts at startup, with the originating configuration file included in the error.
 - [x] Defer route groups and prefix composition; keep route matching literal until a concrete use case establishes precedence requirements.
 - [x] Make the pipeline use PSR-7/PSR-15 consistently and ensure middleware application does not depend on the controller extending a concrete class.
@@ -144,9 +144,9 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 
 ## Deferred decisions and verification
 
-These items stay open because they need more API design or an explicit deployment policy:
+These implementation details remain deferred because they need more API design or an explicit deployment policy:
 
-- Route API: matching remains literal for this iteration. Path parameters, route metadata, group/prefix composition, and built-in reference routes are explicitly deferred.
+- Route API decision: keep paths literal and identify a route by its literal path and HTTP method. Pass variable input through query/form parameters. This avoids pattern matching and hidden ambiguity in the router. Group/prefix composition, arbitrary route metadata, and built-in reference routes remain deferred.
 - Handler preflight: known classes are checked during container build without constructing instances. Untyped factory outputs and constructor dependency resolution remain runtime checks.
 - Production mode and performance: no separate production-mode switch will be added. Caches remain content-based, and deployment must rebuild/restart application processes after configuration or module changes. The current local baseline is recorded in [`performance-baseline.md`](performance-baseline.md); optimize only after repeated measurements or a concrete workload justify it.
 - End-to-end module verification: the integration test exercises Composer-style vendor package fixtures through discovery, activation, container/router/bus construction, HTTP dispatch, and collision detection. It creates package metadata and files directly instead of invoking Composer to install external module repositories; deactivation/removal remain covered by module lifecycle and cache rebuild tests.

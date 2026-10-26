@@ -70,4 +70,4 @@ Route replacement is supported only when the replacement keeps the target route 
 }
 ```
 
-Only one override may target a route. Parameterized paths and route groups are not currently supported; see the [deferred route design](http-routing.md#deferred-route-design).
+Only one override may target a route. Paths are intentionally literal; callers pass variable values as query/form parameters. Route groups and prefixes remain deferred; see [HTTP routing](http-routing.md#deferred-route-composition).

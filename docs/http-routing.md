@@ -4,7 +4,8 @@ The machine-readable route definition is owned by the [`flexi/contracts` routes 
 
 ## Current route behavior
 
-- `path` is matched literally against the request URI path. The schema currently has no syntax for extracting path parameters; `parameters` describes required query/form values read from `$_GET` and `$_POST`.
+- `path` is matched literally against the request URI path. A route is uniquely identified by its HTTP method and literal path; duplicate method/path pairs fail during router construction. This is a deliberate simplicity decision: the router does not parse patterns or extract values from path segments, avoiding extra matching work and ambiguous patterns.
+- Supply variable request values as query-string parameters for `GET` requests or form parameters for other supported methods. The `parameters` list declares required values read from `$_GET` and `$_POST`.
 - `controller` resolves to a PSR-15 `RequestHandlerInterface`. It does not need to extend Flexi's `HttpHandler` base class.
 - Each `middlewares` string is resolved through the PSR-11 container. The resolved object must implement PSR-15 `MiddlewareInterface`; aliases and factories can be registered in `services.json`.
 - During container build, Flexi checks known controller and middleware classes without constructing them. Typed factory return values are checked statically; untyped factory results retain the runtime interface check.
@@ -38,6 +39,6 @@ The machine-readable route definition is owned by the [`flexi/contracts` routes 
 
 Route overrides keep the existing route name and declare that name in `overrides`. Duplicate route names and duplicate method/path pairs fail during router construction and include the contributing configuration files. The override behavior is described in [Configuration Load Order and Priority](configuration-load-order.md).
 
-## Deferred route design
+## Deferred route composition
 
-Parameterized path matching and arbitrary route metadata are not part of the current Contracts schema or router behavior. Path matching remains literal for this roadmap iteration. Route grouping and prefix composition across application, module, and individual route levels remain deferred until their precedence is agreed.
+Parameterized path matching is intentionally excluded from the routing design. Arbitrary route metadata and route grouping/prefix composition across application, module, and individual route levels remain deferred until a concrete need establishes their precedence and contract.
