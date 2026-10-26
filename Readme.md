@@ -91,7 +91,7 @@ For example, a module can declare its routes and services like this:
 
 ### Available Commands
 
-The available module console commands are defined in [`src/Config/commands.json`](src/Config/commands.json). Install package dependencies with Composer, then use the registered `modules:list`, `modules:status`, `modules:activate`, `modules:deactivate`, `modules:info`, `modules:validate`, and `modules:env-update` commands as appropriate. The module lifecycle documentation describes which behaviors are implemented and which remain roadmap items.
+The available module console commands are defined in [`src/Config/commands.json`](src/Config/commands.json). Install package dependencies with Composer, then use the registered `modules:list`, `modules:status`, `modules:activate`, `modules:deactivate`, `modules:info`, `modules:validate`, `modules:env-update`, and `modules:publish` commands as appropriate. Publishing copies a vendor package into `modules/` and switches Composer to a local path repository; this transition is one-way and documented in the [module recipes](docs/module-recipes.md#publish-a-vendor-module-for-local-editing).
 
 For a copyable module structure and operational steps, see the [minimal module template](docs/module-template.md) and [module recipes](docs/module-recipes.md).
 

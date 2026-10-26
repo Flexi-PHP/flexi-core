@@ -104,6 +104,13 @@
       }
     },
     {
+      "name": "Flexi\\Application\\Services\\ComposerProcessInterface",
+      "class": {
+        "name": "Flexi\\Infrastructure\\Services\\NativeComposerProcess",
+        "arguments": []
+      }
+    },
+    {
       "name": "Flexi\\Domain\\Interfaces\\ModuleCacheManagerInterface",
       "class": {
         "name": "Flexi\\Infrastructure\\Classes\\ModuleCacheManager",
@@ -213,6 +220,18 @@
           "@Flexi\\Domain\\Interfaces\\ModuleEnvironmentManagerInterface",
           "@Flexi\\Application\\Services\\ModuleActivationPreflightInterface",
           "@Flexi\\Contracts\\Interfaces\\EventBusInterface"
+        ]
+      }
+    },
+    {
+      "name": "Flexi\\Application\\UseCase\\PublishModule",
+      "class": {
+        "name": "Flexi\\Application\\UseCase\\PublishModule",
+        "arguments": [
+          "@Flexi\\Domain\\Interfaces\\ModuleDetectorInterface",
+          "@Flexi\\Domain\\Interfaces\\ModuleStateManagerInterface",
+          "@Flexi\\Application\\Services\\ComposerProcessInterface",
+          "./"
         ]
       }
     },

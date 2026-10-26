@@ -73,9 +73,9 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Decide that Composer exclusively owns package installation, dependency resolution, and uninstallation; Flexi owns activation state and runtime registration.
 - [x] Decide that publishing a vendor-installed module means copying its package into `modules/` and adding a Composer `path` repository entry for that local package.
 - [x] Treat publication as a one-way development transition. Returning to a Packagist package requires manually removing the local path repository entry, then installing/updating the published Composer package normally.
-- [ ] Implement `modules:publish` with validation, safe copy, Composer manifest/lock update, and actionable recovery behavior.
-- [ ] Ensure local and vendor discovery identify the same package by the canonical `extra.flexi.module-name`, and reject ambiguous duplicate sources rather than selecting one implicitly.
-- [ ] Reconcile persisted activation state with discovered Composer packages so newly discovered packages are inactive and removed packages cannot leave stale activation state.
+- [x] Implement `modules:publish` with manifest validation, safe copy, a Composer path repository pinned to the locked version, targeted Composer update, rollback/recovery, and an explicit report when recovery fails.
+- [x] Ensure local and vendor discovery identify the same module by canonical `extra.flexi.module-name`; treat a Composer path symlink and its local source as one module and reject distinct ambiguous duplicate sources.
+- [x] Reconcile persisted activation state with discovered Composer packages so newly discovered packages are inactive and removed packages cannot leave stale activation state.
 
 **Acceptance:** Composer is the only source of package presence; a published local copy is editable under `modules/` and Composer resolves it through a path repository; activation remains a separate explicit choice.
 
@@ -123,8 +123,8 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Verify known listener/handler classes and interface compatibility during container build without constructing handlers/listeners; keep runtime instantiation lazy to avoid constructor side effects during validation.
 - [x] Define error propagation and listener stop behavior: handler/listener exceptions propagate, and stopped events skip later listeners; see [`message-handlers.md`](message-handlers.md).
 - [x] Ensure that activating or deactivating a module adds or removes all its registrations in a clean rebuild; bus builds use the current configuration file set, covered by a regression test.
-- [ ] Preflight a candidate module and its combined configuration with currently active modules before persisting activation.
-- [ ] Dispatch typed module-activated and module-deactivated events after successful state changes so listeners can invalidate module/configuration caches or rebuild derived manifests.
+- [x] Preflight a candidate module and its combined configuration with currently active modules before persisting activation.
+- [x] Dispatch typed module-activated and module-deactivated events after successful state changes so listeners can invalidate module/configuration caches or rebuild derived manifests.
 
 **Acceptance:** priorities and order are observable and deterministic; handler errors are detected with their originating module; inactive modules leave no lingering listeners or handlers behind.
 

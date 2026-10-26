@@ -21,7 +21,7 @@ Use Flexi's publish command to copy an installed module from `vendor/` into `mod
 php bin/console --command modules:publish module_name=Example
 ```
 
-The command updates the Composer installation so the local package becomes the source Composer autoloads. Review the `composer.json`, `composer.lock`, and copied package before committing. Publication is intentionally one-way. To use an officially published package again, manually remove its local `path` repository entry from the root `composer.json`, then run the normal Composer update/install for that package. Flexi does not provide an unpublish command.
+The command validates the module manifest, copies the package while rejecting symbolic links, registers a Composer `path` repository with the locked package version, and asks Composer to update only that package. If Composer fails, Flexi restores the root Composer files, removes the copy, and attempts `composer install` from the restored lock file. Review the `composer.json`, `composer.lock`, and copied package before committing. The copy is tracked by the root repository; the extracted `example-auth` migration residue stays ignored. Publication is intentionally one-way. To use an officially published package again, manually remove its local `path` repository entry from the root `composer.json`, then run the normal Composer update/install for that package. Flexi does not provide an unpublish command.
 
 Publishing does not activate the module. Validate and explicitly activate it as a separate operation.
 
