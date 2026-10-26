@@ -25,6 +25,7 @@ class HandlerDefinitionValidatorTest extends TestCase
         $this->tempDirectory = sys_get_temp_dir() . '/flexi-preflight-' . uniqid('', true);
         mkdir($this->tempDirectory, 0777, true);
         PreflightRequestHandler::$constructed = false;
+        PreflightControllerFactory::$called = false;
     }
 
     protected function tearDown(): void
@@ -84,6 +85,24 @@ class HandlerDefinitionValidatorTest extends TestCase
         (new HandlerDefinitionValidator())->validate(['commands' => [$file]], []);
     }
 
+    public function testResolvesAliasesAndTypedFactoriesWithoutCallingFactory(): void
+    {
+        $file = $this->write('routes.json', ['routes' => [[
+            'controller' => 'preflight.controller.alias',
+        ]]]);
+        $services = [
+            'preflight.controller.alias' => 'preflight.controller',
+            'preflight.controller' => ['factory' => [
+                'class' => PreflightControllerFactory::class,
+                'method' => 'create',
+            ]],
+        ];
+
+        (new HandlerDefinitionValidator())->validate(['routes' => [$file]], $services);
+
+        $this->assertFalse(PreflightControllerFactory::$called);
+    }
+
     private function write(string $name, array $document): string
     {
         $file = $this->tempDirectory . '/' . $name;
@@ -128,5 +147,17 @@ class PreflightCommandHandler implements HandlerInterface
     public function handle(DTOInterface $command): MessageInterface
     {
         throw new \LogicException('Not called during static validation.');
+    }
+}
+
+class PreflightControllerFactory
+{
+    public static bool $called = false;
+
+    public static function create(): RequestHandlerInterface
+    {
+        self::$called = true;
+
+        return new PreflightRequestHandler();
     }
 }

@@ -157,6 +157,13 @@ class HandlerDefinitionValidator
             return null;
         }
 
+        if ($returnType->getName() === 'self') {
+            return $factoryMethod->getDeclaringClass()->getName();
+        }
+        if ($returnType->getName() === 'static') {
+            return $class;
+        }
+
         return $returnType->getName();
     }
 
