@@ -66,7 +66,18 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Define deactivation's observable effect: inactive modules contribute no services, routes, listeners, commands, or queries after the next application build.
 - [x] Require explicit activation: newly discovered modules initialize as inactive.
 
-**Acceptance:** a valid example module can be installed, discovered, activated, and deactivated following a single guide without editing core configuration paths. The manifest schema and lifecycle are defined; applying them to the existing example is deferred until module migration, and runtime validation remains in Block 2.
+**Acceptance:** an independent module package can be installed, discovered, activated, and deactivated following a single guide without editing core configuration paths. The manifest schema and lifecycle are defined; runtime validation and publication steps are tracked below.
+
+### Module package presence and local publication
+
+- [x] Decide that Composer exclusively owns package installation, dependency resolution, and uninstallation; Flexi owns activation state and runtime registration.
+- [x] Decide that publishing a vendor-installed module means copying its package into `modules/` and adding a Composer `path` repository entry for that local package.
+- [x] Treat publication as a one-way development transition. Returning to a Packagist package requires manually removing the local path repository entry, then installing/updating the published Composer package normally.
+- [ ] Implement `modules:publish` with validation, safe copy, Composer manifest/lock update, and actionable recovery behavior.
+- [ ] Ensure local and vendor discovery identify the same package by the canonical `extra.flexi.module-name`, and reject ambiguous duplicate sources rather than selecting one implicitly.
+- [ ] Reconcile persisted activation state with discovered Composer packages so newly discovered packages are inactive and removed packages cannot leave stale activation state.
+
+**Acceptance:** Composer is the only source of package presence; a published local copy is editable under `modules/` and Composer resolves it through a path repository; activation remains a separate explicit choice.
 
 ## Block 2 — Configuration validation and composition
 
@@ -112,6 +123,8 @@ The `EventListenerInterface` separation is a breaking change because the interfa
 - [x] Verify known listener/handler classes and interface compatibility during container build without constructing handlers/listeners; keep runtime instantiation lazy to avoid constructor side effects during validation.
 - [x] Define error propagation and listener stop behavior: handler/listener exceptions propagate, and stopped events skip later listeners; see [`message-handlers.md`](message-handlers.md).
 - [x] Ensure that activating or deactivating a module adds or removes all its registrations in a clean rebuild; bus builds use the current configuration file set, covered by a regression test.
+- [ ] Preflight a candidate module and its combined configuration with currently active modules before persisting activation.
+- [ ] Dispatch typed module-activated and module-deactivated events after successful state changes so listeners can invalidate module/configuration caches or rebuild derived manifests.
 
 **Acceptance:** priorities and order are observable and deterministic; handler errors are detected with their originating module; inactive modules leave no lingering listeners or handlers behind.
 
@@ -152,6 +165,13 @@ These implementation details remain deferred because they need more API design o
 - End-to-end module verification: the integration test exercises Composer-style vendor package fixtures through discovery, activation, container/router/bus construction, HTTP dispatch, and collision detection. It creates package metadata and files directly instead of invoking Composer to install external module repositories; deactivation/removal remain covered by module lifecycle and cache rebuild tests.
 - [x] Debug CLI smoke test: `modules:list` completes with the development default `debug=true`; the error-handler wrapper respects PHP's `error_reporting()` mask so suppressed deprecations do not become exceptions.
 - Historical docs: superseded architecture proposals and reports are indexed and labeled. Their historical content and translation scope remain unchanged.
+
+## Module management decisions
+
+- Composer package presence defines installation: `composer require` installs and `composer remove` uninstalls. Flexi does not duplicate these package-manager operations.
+- `modules:publish` copies an installed vendor package into `modules/`, registers that directory as a Composer `path` repository, and updates the Composer installation so the local copy is the active package source. Publication is intentionally one-way.
+- To return to a published package, the developer manually removes the local `path` repository entry and then runs the conventional Composer installation/update for that package.
+- Activation is a separate persisted choice. A module must pass preflight before activation state changes. Activation and deactivation emit lifecycle events after successful state changes.
 
 ## Progress rule
 
