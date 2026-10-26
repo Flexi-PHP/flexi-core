@@ -228,6 +228,14 @@ class VendorModuleDetector implements ModuleDetectorInterface
                 try {
                     $moduleData = $this->parseModuleComposerJson($composerJsonPath, $packagePath, $vendor . '/' . $package);
                     if ($moduleData) {
+                        if (isset($modules[$moduleData['name']])) {
+                            throw new \RuntimeException(sprintf(
+                                'Multiple Composer packages declare the logical module name "%s": %s and %s.',
+                                $moduleData['name'],
+                                $modules[$moduleData['name']]['package'],
+                                $moduleData['package']
+                            ));
+                        }
                         $modules[$moduleData['name']] = $moduleData;
                     }
                 } catch (\JsonException $e) {

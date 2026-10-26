@@ -222,6 +222,12 @@ class ConfigurationFilesProvider implements CandidateConfigurationFilesProviderI
                 $this->moduleStateManager->isModuleActive($module->getName())
                 || ($additionalActiveModule !== null && strcasecmp($module->getName(), $additionalActiveModule) === 0)
             ) {
+                if ($module->hasConflict()) {
+                    throw new \RuntimeException(sprintf(
+                        'Active module "%s" has conflicting local and vendor sources. Resolve the duplicate before building configuration.',
+                        $module->getName()
+                    ));
+                }
                 $activeModules[] = $module;
             }
         }

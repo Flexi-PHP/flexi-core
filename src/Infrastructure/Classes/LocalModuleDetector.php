@@ -156,6 +156,14 @@ class LocalModuleDetector implements ModuleDetectorInterface
             try {
                 $moduleData = $this->parseModuleDirectory($modulePath, $moduleDir, $composerJsonPath);
                 if ($moduleData) {
+                    if (isset($this->localModules[$moduleData['name']])) {
+                        throw new \RuntimeException(sprintf(
+                            'Multiple local module directories declare the logical name "%s": %s and %s.',
+                            $moduleData['name'],
+                            $this->localModules[$moduleData['name']]['path'],
+                            $moduleData['path']
+                        ));
+                    }
                     $this->localModules[$moduleData['name']] = $moduleData;
                 }
             } catch (\JsonException $e) {
@@ -233,6 +241,9 @@ class LocalModuleDetector implements ModuleDetectorInterface
             $composerData = $this->parseComposerJson($composerJsonPath);
             if ($composerData) {
                 $moduleData = array_merge($moduleData, [
+                    'name' => is_string($composerData['extra']['flexi']['module-name'] ?? null)
+                        ? $this->normalizeModuleName($composerData['extra']['flexi']['module-name'])
+                        : $moduleData['name'],
                     'package' => $composerData['name'] ?? $moduleData['package'],
                     'version' => $composerData['version'] ?? $moduleData['version'],
                     'metadata' => array_merge($moduleData['metadata'], [

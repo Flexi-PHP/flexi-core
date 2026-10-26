@@ -50,6 +50,13 @@ final class ModuleActivationPreflight implements ModuleActivationPreflightInterf
 
     public function validate(ModuleInfo $module): void
     {
+        if ($module->hasConflict()) {
+            throw new \RuntimeException(sprintf(
+                'Module "%s" has conflicting local and vendor sources; resolve the duplicate before activation.',
+                $module->getName()
+            ));
+        }
+
         (new ModuleManifestValidator())->assertValid($module);
 
         $configurationFiles = $this->configurationFilesProvider->getAllConfigurationFilesIncluding($module->getName());

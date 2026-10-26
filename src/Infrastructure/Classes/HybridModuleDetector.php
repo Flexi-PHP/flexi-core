@@ -59,8 +59,9 @@ class HybridModuleDetector implements ModuleDetectorInterface
         $vendorModule = $this->vendorDetector->getModuleInfo($moduleName);
 
         if ($localModule && $vendorModule) {
-            // Conflict: module exists in both locations - prioritize local
-            return $this->createConflictModule($localModule, $vendorModule);
+            return $this->sameSource($localModule, $vendorModule)
+                ? $localModule
+                : $this->createConflictModule($localModule, $vendorModule);
         }
 
         return $localModule ?? $vendorModule;
@@ -78,7 +79,7 @@ class HybridModuleDetector implements ModuleDetectorInterface
         $vendorModules = $this->vendorDetector->getAllModules();
 
         foreach ($localModules as $moduleName => $localModule) {
-            if (isset($vendorModules[$moduleName])) {
+            if (isset($vendorModules[$moduleName]) && !$this->sameSource($localModule, $vendorModules[$moduleName])) {
                 $conflicts[$moduleName] = $this->createConflictModule(
                     $localModule,
                     $vendorModules[$moduleName]
@@ -99,7 +100,14 @@ class HybridModuleDetector implements ModuleDetectorInterface
         $localModules = $this->localDetector->getAllModules();
         $vendorModules = $this->vendorDetector->getAllModules();
 
-        return array_diff_key($localModules, $vendorModules);
+        $localOnly = [];
+        foreach ($localModules as $name => $module) {
+            if (!isset($vendorModules[$name]) || $this->sameSource($module, $vendorModules[$name])) {
+                $localOnly[$name] = $module;
+            }
+        }
+
+        return $localOnly;
     }
 
     /**
@@ -112,7 +120,14 @@ class HybridModuleDetector implements ModuleDetectorInterface
         $localModules = $this->localDetector->getAllModules();
         $vendorModules = $this->vendorDetector->getAllModules();
 
-        return array_diff_key($vendorModules, $localModules);
+        $vendorOnly = [];
+        foreach ($vendorModules as $name => $module) {
+            if (!isset($localModules[$name])) {
+                $vendorOnly[$name] = $module;
+            }
+        }
+
+        return $vendorOnly;
     }
 
     /**
@@ -124,7 +139,11 @@ class HybridModuleDetector implements ModuleDetectorInterface
         $isVendor = $this->vendorDetector->isModuleInstalled($moduleName);
 
         if ($isLocal && $isVendor) {
-            return ModuleType::mixed();
+            $local = $this->localDetector->getModuleInfo($moduleName);
+            $vendor = $this->vendorDetector->getModuleInfo($moduleName);
+            return $local !== null && $vendor !== null && $this->sameSource($local, $vendor)
+                ? ModuleType::local()
+                : ModuleType::mixed();
         } elseif ($isLocal) {
             return ModuleType::local();
         } elseif ($isVendor) {
@@ -139,8 +158,13 @@ class HybridModuleDetector implements ModuleDetectorInterface
      */
     public function hasModuleConflict(string $moduleName): bool
     {
-        return $this->localDetector->isModuleInstalled($moduleName) &&
-               $this->vendorDetector->isModuleInstalled($moduleName);
+        if (!$this->localDetector->isModuleInstalled($moduleName) || !$this->vendorDetector->isModuleInstalled($moduleName)) {
+            return false;
+        }
+        $local = $this->localDetector->getModuleInfo($moduleName);
+        $vendor = $this->vendorDetector->getModuleInfo($moduleName);
+
+        return $local !== null && $vendor !== null && !$this->sameSource($local, $vendor);
     }
 
     /**
@@ -172,11 +196,9 @@ class HybridModuleDetector implements ModuleDetectorInterface
         // Add all local modules
         foreach ($localModules as $moduleName => $localModule) {
             if (isset($vendorModules[$moduleName])) {
-                // Conflict: create mixed type module
-                $merged[$moduleName] = $this->createConflictModule(
-                    $localModule,
-                    $vendorModules[$moduleName]
-                );
+                $merged[$moduleName] = $this->sameSource($localModule, $vendorModules[$moduleName])
+                    ? $localModule
+                    : $this->createConflictModule($localModule, $vendorModules[$moduleName]);
             } else {
                 // Local only
                 $merged[$moduleName] = $localModule;
@@ -191,6 +213,14 @@ class HybridModuleDetector implements ModuleDetectorInterface
         }
 
         return $merged;
+    }
+
+    private function sameSource(ModuleInfo $left, ModuleInfo $right): bool
+    {
+        $leftPath = realpath($left->getPath());
+        $rightPath = realpath($right->getPath());
+
+        return false !== $leftPath && false !== $rightPath && $leftPath === $rightPath;
     }
 
     /**
