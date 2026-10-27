@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0118fe4a4a930c8fe743ffbed383dfd2",
+    "content-hash": "0b812ba3ce2b07d9fe3939a35d455e95",
     "packages": [
         {
             "name": "bangpound/composer-constants",
@@ -198,16 +198,16 @@
         },
         {
             "name": "flexi/contracts",
-            "version": "5.2.0",
+            "version": "5.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Flexi-PHP/flexi-contracts.git",
-                "reference": "720a5b47385780bd96615d437f59e74dc09d83e5"
+                "reference": "8c13e3ad3261ffcf316eda35a9ec49724d581797"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Flexi-PHP/flexi-contracts/zipball/720a5b47385780bd96615d437f59e74dc09d83e5",
-                "reference": "720a5b47385780bd96615d437f59e74dc09d83e5",
+                "url": "https://api.github.com/repos/Flexi-PHP/flexi-contracts/zipball/8c13e3ad3261ffcf316eda35a9ec49724d581797",
+                "reference": "8c13e3ad3261ffcf316eda35a9ec49724d581797",
                 "shasum": ""
             },
             "require": {
@@ -238,9 +238,9 @@
             "description": "Contracts and PSR dependencies for Flexi Framework - Central interface package",
             "support": {
                 "issues": "https://github.com/Flexi-PHP/flexi-contracts/issues",
-                "source": "https://github.com/Flexi-PHP/flexi-contracts/tree/v5.2.0"
+                "source": "https://github.com/Flexi-PHP/flexi-contracts/tree/v5.2.1"
             },
-            "time": "2026-10-23T20:17:46+00:00"
+            "time": "2026-10-27T23:05:10+00:00"
         },
         {
             "name": "graham-campbell/result-type",
