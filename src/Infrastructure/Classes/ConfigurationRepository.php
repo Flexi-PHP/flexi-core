@@ -30,7 +30,6 @@ class ConfigurationRepository implements ConfigurationRepositoryInterface
         $this->config->add($root_dir, 'ROOT_DIR');
         $this->config->add($root_dir.'/src', 'APP_DIR');
         $this->config->add($root_dir.'/modules', 'MODULES_DIR');
-        $this->config->add($root_dir.'/themes', 'THEMES_DIR');
         $debug = getenv('debug');
         $this->config->add($debug, 'DEBUG_MODE');
     }

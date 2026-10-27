@@ -54,7 +54,6 @@ class ConfigurationRepositoryTest extends TestCase
         $this->assertArrayHasKey('ROOT_DIR', $all);
         $this->assertArrayHasKey('APP_DIR', $all);
         $this->assertArrayHasKey('MODULES_DIR', $all);
-        $this->assertArrayHasKey('THEMES_DIR', $all);
         $this->assertArrayHasKey(self::CUSTOM_KEY, $all);
     }
 }
