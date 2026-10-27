@@ -155,7 +155,7 @@ class ModuleStateManager implements ModuleStateManagerInterface
     public function initializeModuleState(
         string $moduleName,
         ModuleType $type,
-        bool $active = true,
+        bool $active = false,
         ?string $modifiedBy = null
     ): bool {
         // Don't overwrite existing state
@@ -243,8 +243,8 @@ class ModuleStateManager implements ModuleStateManagerInterface
             $existingState = $this->repository->find($moduleName);
 
             if (!$existingState) {
-                // New module - initialize as active
-                if ($this->initializeModuleState($moduleName, $moduleInfo->getType(), true, 'sync')) {
+                // Newly discovered modules require an explicit activation decision.
+                if ($this->initializeModuleState($moduleName, $moduleInfo->getType(), false, 'sync')) {
                     $summary['initialized']++;
                     $summary['actions'][$moduleName] = 'initialized';
                 } else {

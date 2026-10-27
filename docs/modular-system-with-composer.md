@@ -1,5 +1,7 @@
 # Sistema de Gestión Modular con Composer
 
+> **Legacy design note:** This document contains historical package names, dependency rules, and examples. The canonical module metadata is defined in [Module Manifest](module-manifest.md); use that specification for new modules. This document has not yet been fully migrated.
+
 ## Resumen
 
 Este documento describe la implementación del sistema de gestión modular para Flexi Framework, donde cada módulo es un paquete Composer independiente con sus propias dependencias, permitiendo instalación/desinstalación dinámica y gestión centralizada de versiones.

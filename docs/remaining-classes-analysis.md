@@ -1,5 +1,7 @@
 # Analysis of Remaining Classes in Domain/Classes
 
+> **Superseded analysis:** The `Domain/Classes` layout described here is outdated. Use the current [HTTP routing](http-routing.md) and [service definitions](service-definitions.md) documentation instead.
+
 ## Analyzed Classes
 
 ### 1. **Route.php** ❌ NOT Domain

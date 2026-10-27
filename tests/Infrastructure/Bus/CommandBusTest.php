@@ -85,9 +85,31 @@ class CommandBusTest extends TestCase
         $this->assertEquals('message', $message->get('body'));
     }
 
+    public function testExecuteResolvesHandlerServiceThroughContainer(): void
+    {
+        $handler = $this->createMock(TestCommandHandler::class);
+        $handler->expects($this->once())->method('handle')->with($this->isInstanceOf(TestCommand::class))
+            ->willReturn(new PlainTextMessage('service'));
+        $this->container->expects($this->once())->method('has')->with(TestCommandHandler::class)->willReturn(true);
+        $this->container->expects($this->once())->method('get')->with(TestCommandHandler::class)->willReturn($handler);
+        $this->class_factory->expects($this->never())->method('build');
+        $this->event_bus->method('dispatch')->willReturnSelf();
+
+        $message = $this->commandBus->execute(new TestCommand());
+
+        $this->assertSame('service', $message->get('body'));
+    }
+
     public function testGetHandler(): void
     {
         $this->assertEquals(TestCommandHandler::class, $this->commandBus->getHandler(TestCommand::class));
+    }
+
+    public function testRegisterRejectsDuplicateHandlerId(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Handler ID');
+        $this->commandBus->register(TestCommand::class, TestCommandHandler::class);
     }
 
     public function testGetHandlerDoesNotExist(): void

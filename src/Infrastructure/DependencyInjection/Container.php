@@ -13,13 +13,12 @@ use Psr\Container\NotFoundExceptionInterface;
 
 class Container implements ContainerInterface
 {
-    private const CONTAINER_CACHE_KEY = 'container';
-    private const SERVICE_CACHE_KEY_PREFIX = 'service.';
-    private const SERVICE_DEFINITIONS_KEY = 'service_definitions';
     private const ERROR_SELF_REFERENCE = 'Cannot register self-referencing service: %s';
     private const ERROR_INVALID_DEFINITION = 'Service definition must be an object, an array, or a string class name.';
 
     private array $serviceDefinitions;
+    private array $serviceInstances = [];
+    private array $serviceSources = [];
     private array $selfReference = ['container', ContainerInterface::class];
 
     private ObjectBuilderInterface $factory;
@@ -30,8 +29,8 @@ class Container implements ContainerInterface
         $this->cache = $cache;
         $this->factory = $factory;
 
-        // Initialize the container with the default service definitions
-        $this->serviceDefinitions = $cache->get(self::SERVICE_DEFINITIONS_KEY, []);
+        // Definitions and instances belong to this build and must not leak through a shared cache.
+        $this->serviceDefinitions = [];
 
         $this->set('cache', $cache);
         $this->set('factory', $this->factory);
@@ -43,22 +42,24 @@ class Container implements ContainerInterface
      * @param string              $id                The service ID
      * @param string|array|object $serviceDefinition The service definition
      */
-    public function set(string $id, $serviceDefinition): void
+    public function set(string $id, $serviceDefinition, ?string $source = null): void
     {
         if ($this->has($id)) {
             return;
         }
 
         $this->validateServiceDefinition($id, $serviceDefinition);
+        if ($source !== null) {
+            $this->serviceSources[$id] = $source;
+        }
 
         if (is_object($serviceDefinition) && !is_callable($serviceDefinition)) {
-            $this->cacheServiceInstance($id, $serviceDefinition);
+            $this->serviceInstances[$id] = $serviceDefinition;
 
             return;
         }
 
         $this->serviceDefinitions[$id] = $serviceDefinition;
-        $this->cache->set(self::SERVICE_DEFINITIONS_KEY, $this->serviceDefinitions);
     }
 
     /**
@@ -68,7 +69,17 @@ class Container implements ContainerInterface
     {
         return in_array($id, $this->selfReference, true)
             || isset($this->serviceDefinitions[$id])
-            || $this->cache->has($this->generateServiceCacheKey($id));
+            || isset($this->serviceInstances[$id]);
+    }
+
+    /**
+     * Return the configuration file that contributed each registered service definition.
+     *
+     * @return string[] Service ID to configuration file path.
+     */
+    public function getServiceSources(): array
+    {
+        return $this->serviceSources;
     }
 
     /**
@@ -91,18 +102,21 @@ class Container implements ContainerInterface
             return $this->factory;
         }
 
-        $cacheKey = $this->generateServiceCacheKey($id);
-        if ($this->cache->has($cacheKey)) {
-            return $this->cache->get($cacheKey);
+        if (isset($this->serviceInstances[$id])) {
+            return $this->serviceInstances[$id];
         }
 
         try {
             $serviceInstance = $this->resolveServiceInstance($id);
         } catch (\Throwable $th) {
-            throw new ServiceNotFoundException(sprintf('Class %s does not exist', $id), 0, $th);
+            $source = $this->serviceSources[$id] ?? null;
+            $message = $source === null
+                ? sprintf('Class %s does not exist', $id)
+                : sprintf('Unable to resolve service "%s" from %s: %s', $id, $source, $th->getMessage());
+            throw new ServiceNotFoundException($message, 0, $th);
         }
 
-        $this->cacheServiceInstance($id, $serviceInstance);
+        $this->serviceInstances[$id] = $serviceInstance;
 
         return $serviceInstance;
     }
@@ -156,21 +170,5 @@ class Container implements ContainerInterface
         if (!is_object($serviceDefinition) && !is_array($serviceDefinition) && !is_string($serviceDefinition)) {
             throw new \InvalidArgumentException(self::ERROR_INVALID_DEFINITION);
         }
-    }
-
-    /**
-     * Caches a service instance.
-     */
-    private function cacheServiceInstance(string $id, object $serviceInstance): void
-    {
-        $this->cache->set($this->generateServiceCacheKey($id), $serviceInstance);
-    }
-
-    /**
-     * Generate a cache key for a service.
-     */
-    private function generateServiceCacheKey(string $id): string
-    {
-        return self::SERVICE_CACHE_KEY_PREFIX.md5($id);
     }
 }

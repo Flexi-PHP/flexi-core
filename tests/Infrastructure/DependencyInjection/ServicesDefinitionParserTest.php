@@ -35,8 +35,10 @@ final class ServicesDefinitionParserTest extends TestCase
             'services' => [
                 [
                     'name' => 'database',
-                    'class' => 'PDO',
-                    'arguments' => ['mysql:host=localhost', 'user', 'pass'],
+                    'class' => [
+                        'name' => 'PDO',
+                        'arguments' => ['mysql:host=localhost', 'user', 'pass'],
+                    ],
                 ],
                 [
                     'name' => 'logger',
@@ -44,7 +46,7 @@ final class ServicesDefinitionParserTest extends TestCase
                 ],
                 [
                     'name' => 'cache',
-                    'factory' => ['CacheFactory', 'create'],
+                    'factory' => ['class' => 'CacheFactory', 'method' => 'create'],
                 ],
             ],
         ];
@@ -55,16 +57,18 @@ final class ServicesDefinitionParserTest extends TestCase
         $this->assertCount(3, $services);
         $this->assertEquals([
             'name' => 'database',
-            'class' => 'PDO',
-            'arguments' => ['mysql:host=localhost', 'user', 'pass'],
+            'class' => [
+                'name' => 'PDO',
+                'arguments' => ['mysql:host=localhost', 'user', 'pass'],
+            ],
         ], $services['database']);
         $this->assertEquals('monolog.logger', $services['logger']);
         $this->assertEquals([
             'name' => 'cache',
-            'factory' => ['CacheFactory', 'create'],
+            'factory' => ['class' => 'CacheFactory', 'method' => 'create'],
         ], $services['cache']);
 
-        $cacheKey = 'services_file.' . md5($file);
+        $cacheKey = 'services_file.' . md5($file.hash_file('sha256', $file));
         $this->assertArrayHasKey($cacheKey, $cache->store);
         $cachedServices = $cache->store[$cacheKey];
         $this->assertCount(3, $cachedServices);
@@ -84,16 +88,34 @@ final class ServicesDefinitionParserTest extends TestCase
         ]);
 
         $cachedServices = [
-            'cached_service' => ['name' => 'cached', 'class' => 'CachedClass']
+            'cached_service' => ['name' => 'cached', 'class' => ['name' => 'CachedClass']]
         ];
-        $cache->store['services_file.' . md5($file)] = $cachedServices;
+        $cacheKey = 'services_file.' . md5($file.hash_file('sha256', $file));
+        $cache->store[$cacheKey] = $cachedServices;
 
         $parser = new ServicesDefinitionParser($cache);
 
         $result = $parser->parse($file);
 
         $this->assertSame($cachedServices, $result);
-        $this->assertSame(0, $cache->setCalls['services_file.' . md5($file)] ?? 0);
+        $this->assertSame(0, $cache->setCalls[$cacheKey] ?? 0);
+    }
+
+    public function testParseInvalidatesCachedServicesWhenFileContentsChange(): void
+    {
+        $file = $this->tempDir . '/changing_services.json';
+        file_put_contents($file, json_encode([
+            'services' => [['name' => 'mailer', 'class' => ['name' => 'App\\Mail\\FirstMailer']]],
+        ]));
+
+        $parser = new ServicesDefinitionParser(new ServicesArrayCache());
+        $this->assertSame('App\\Mail\\FirstMailer', $parser->parse($file)['mailer']['class']['name']);
+
+        file_put_contents($file, json_encode([
+            'services' => [['name' => 'mailer', 'class' => ['name' => 'App\\Mail\\SecondMailer']]],
+        ]));
+
+        $this->assertSame('App\\Mail\\SecondMailer', $parser->parse($file)['mailer']['class']['name']);
     }
 
     public function testParseThrowsWhenFileDoesNotExist(): void
@@ -120,7 +142,7 @@ final class ServicesDefinitionParserTest extends TestCase
         $this->assertSame([], $services);
     }
 
-    public function testParseHandlesServiceWithOnlyName(): void
+    public function testParseRejectsServiceWithoutRegistrationStrategy(): void
     {
         $cache = new ServicesArrayCache();
         $parser = new ServicesDefinitionParser($cache);
@@ -130,15 +152,14 @@ final class ServicesDefinitionParserTest extends TestCase
             'services' => [
                 [
                     'name' => 'minimal',
-                    // No class, factory, or alias - should not be included
                 ],
             ],
         ];
         file_put_contents($file, json_encode($definitions, JSON_PRETTY_PRINT));
 
-        $services = $parser->parse($file);
-
-        $this->assertCount(0, $services); // Services with only name are not included
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Invalid configuration');
+        $parser->parse($file);
     }
 
     private function removeDirectory(string $path): void

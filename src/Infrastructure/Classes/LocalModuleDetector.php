@@ -19,7 +19,9 @@ class LocalModuleDetector implements ModuleDetectorInterface
 {
     private string $modulesPath;
     private ModuleCacheManagerInterface $cacheManager;
-    private static ?array $localModules = null;
+    private ?array $localModules = null;
+    private int $cacheGeneration;
+    private static int $cacheGenerationCounter = 0;
 
     public function __construct(
         ModuleCacheManagerInterface $cacheManager,
@@ -27,6 +29,7 @@ class LocalModuleDetector implements ModuleDetectorInterface
     ) {
         $this->modulesPath = rtrim($modulesPath, '/');
         $this->cacheManager = $cacheManager;
+        $this->cacheGeneration = self::$cacheGenerationCounter;
     }
 
     /**
@@ -119,21 +122,25 @@ class LocalModuleDetector implements ModuleDetectorInterface
      */
     private function getLocalModules(): array
     {
-        if (self::$localModules !== null) {
-            return self::$localModules;
+        if ($this->cacheGeneration !== self::$cacheGenerationCounter) {
+            $this->localModules = null;
+            $this->cacheGeneration = self::$cacheGenerationCounter;
+        }
+        if ($this->localModules !== null) {
+            return $this->localModules;
         }
 
         // Try to load from cache first
         $cachedModules = $this->loadFromCache();
         if ($cachedModules !== null) {
-            self::$localModules = $cachedModules;
-            return self::$localModules;
+            $this->localModules = $cachedModules;
+            return $this->localModules;
         }
 
-        self::$localModules = [];
+        $this->localModules = [];
 
         if (!is_dir($this->modulesPath)) {
-            return self::$localModules;
+            return $this->localModules;
         }
 
         $directories = $this->scanModulesDirectory();
@@ -149,7 +156,15 @@ class LocalModuleDetector implements ModuleDetectorInterface
             try {
                 $moduleData = $this->parseModuleDirectory($modulePath, $moduleDir, $composerJsonPath);
                 if ($moduleData) {
-                    self::$localModules[$moduleData['name']] = $moduleData;
+                    if (isset($this->localModules[$moduleData['name']])) {
+                        throw new \RuntimeException(sprintf(
+                            'Multiple local module directories declare the logical name "%s": %s and %s.',
+                            $moduleData['name'],
+                            $this->localModules[$moduleData['name']]['path'],
+                            $moduleData['path']
+                        ));
+                    }
+                    $this->localModules[$moduleData['name']] = $moduleData;
                 }
             } catch (\JsonException $e) {
                 // Skip directories with invalid composer.json
@@ -158,9 +173,9 @@ class LocalModuleDetector implements ModuleDetectorInterface
         }
 
         // Cache the discovered modules
-        $this->saveToCache(self::$localModules);
+        $this->saveToCache($this->localModules);
 
-        return self::$localModules;
+        return $this->localModules;
     }
 
     /**
@@ -226,6 +241,9 @@ class LocalModuleDetector implements ModuleDetectorInterface
             $composerData = $this->parseComposerJson($composerJsonPath);
             if ($composerData) {
                 $moduleData = array_merge($moduleData, [
+                    'name' => is_string($composerData['extra']['flexi']['module-name'] ?? null)
+                        ? $this->normalizeModuleName($composerData['extra']['flexi']['module-name'])
+                        : $moduleData['name'],
                     'package' => $composerData['name'] ?? $moduleData['package'],
                     'version' => $composerData['version'] ?? $moduleData['version'],
                     'metadata' => array_merge($moduleData['metadata'], [
@@ -361,6 +379,6 @@ class LocalModuleDetector implements ModuleDetectorInterface
      */
     public static function clearCache(): void
     {
-        self::$localModules = null;
+        ++self::$cacheGenerationCounter;
     }
 }

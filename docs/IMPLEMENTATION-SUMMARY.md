@@ -1,5 +1,7 @@
 # Resumen: Sistema de Gestión Modular Automática
 
+> **Historical report:** The local module inventory and implementation details below do not match this checkout. Use the current [module manifest](module-manifest.md), [module lifecycle](module-lifecycle.md), and [historical documentation index](historical-documentation.md) instead.
+
 ## ✅ Implementación Completada
 
 Se ha implementado exitosamente un sistema completo de gestión modular con las siguientes características:

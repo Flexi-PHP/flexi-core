@@ -132,6 +132,53 @@ final class HybridModuleDetectorTest extends TestCase
         $this->assertArrayHasKey('Monitor', $refreshed);
     }
 
+    public function testPathRepositorySymlinkToPublishedLocalModuleIsOneLocalSource(): void
+    {
+        $modulePath = $this->modulesDir . '/CustomAuth';
+        mkdir($modulePath);
+        file_put_contents($modulePath . '/composer.json', json_encode([
+            'name' => 'acme/flexi-auth',
+            'type' => 'flexi-module',
+            'extra' => ['flexi' => ['module-name' => 'Auth']],
+        ]));
+
+        mkdir($this->vendorDir . '/acme', 0777, true);
+        symlink($modulePath, $this->vendorDir . '/acme/flexi-auth');
+
+        $cacheManager = new NullCacheManager();
+        $detector = new HybridModuleDetector(
+            new LocalModuleDetector($cacheManager, $this->modulesDir),
+            new VendorModuleDetector($cacheManager, $this->vendorDir)
+        );
+
+        $this->assertCount(1, $detector->getAllModules());
+        $this->assertSame('Auth', $detector->getAllModules()['Auth']->getName());
+        $this->assertFalse($detector->hasModuleConflict('Auth'));
+        $this->assertTrue($detector->getModuleInstallationType('Auth')->equals(ModuleType::local()));
+        $this->assertSame([], $detector->getConflictedModules());
+    }
+
+    public function testDifferentLocalAndVendorSourcesRemainAnExplicitConflict(): void
+    {
+        $this->createLocalModule('CustomAuth', [
+            'name' => 'acme/flexi-auth',
+            'extra' => ['flexi' => ['module-name' => 'Auth']],
+        ]);
+        $this->createVendorModule('acme', 'flexi-auth', [
+            'name' => 'acme/flexi-auth',
+            'extra' => ['flexi' => ['module-name' => 'Auth']],
+        ]);
+
+        $cacheManager = new NullCacheManager();
+        $detector = new HybridModuleDetector(
+            new LocalModuleDetector($cacheManager, $this->modulesDir),
+            new VendorModuleDetector($cacheManager, $this->vendorDir)
+        );
+
+        $this->assertTrue($detector->hasModuleConflict('Auth'));
+        $this->assertTrue($detector->getModuleInfo('Auth')->hasConflict());
+    }
+
     private function createLocalModule(string $name, array $data): void
     {
         $modulePath = $this->modulesDir . '/' . $name;
@@ -156,6 +203,11 @@ final class HybridModuleDetectorTest extends TestCase
 
     private function removeDirectory(string $path): void
     {
+        if (is_link($path)) {
+            unlink($path);
+            return;
+        }
+
         if (!is_dir($path)) {
             if (file_exists($path)) {
                 unlink($path);

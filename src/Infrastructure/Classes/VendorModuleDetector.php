@@ -14,14 +14,16 @@ use Flexi\Contracts\Interfaces\LoggerInterface;
  * Module detector for vendor-installed packages.
  *
  * Detects modules installed via Composer by scanning composer.json files
- * for 'extra.flexi-module' metadata. Uses intelligent caching based on
- * composer.lock modification time to improve performance.
+ * for Flexi module metadata in Composer's extra section. Uses content-based cache
+ * validation for composer.lock and discovered package manifests.
  */
 class VendorModuleDetector implements ModuleDetectorInterface
 {
     private string $vendorPath;
     private ModuleCacheManagerInterface $cacheManager;
-    private static ?array $installedModules = null;
+    private ?array $installedModules = null;
+    private int $cacheGeneration;
+    private static int $cacheGenerationCounter = 0;
 
     public function __construct(
         ModuleCacheManagerInterface $cacheManager,
@@ -29,6 +31,7 @@ class VendorModuleDetector implements ModuleDetectorInterface
     ) {
         $this->vendorPath = rtrim($vendorPath, '/');
         $this->cacheManager = $cacheManager;
+        $this->cacheGeneration = self::$cacheGenerationCounter;
     }
 
     /**
@@ -121,23 +124,27 @@ class VendorModuleDetector implements ModuleDetectorInterface
      */
     private function getInstalledModules(): array
     {
-        if (self::$installedModules !== null) {
-            return self::$installedModules;
+        if ($this->cacheGeneration !== self::$cacheGenerationCounter) {
+            $this->installedModules = null;
+            $this->cacheGeneration = self::$cacheGenerationCounter;
+        }
+        if ($this->installedModules !== null) {
+            return $this->installedModules;
         }
 
         // Try to load from cache first
         $cachedModules = $this->loadFromCache();
         if ($cachedModules !== null) {
-            self::$installedModules = $cachedModules;
-            return self::$installedModules;
+            $this->installedModules = $cachedModules;
+            return $this->installedModules;
         }
 
         // Scan vendor directory and cache results
         $discoveredModules = $this->scanVendorForModules();
         $this->saveToCache($discoveredModules);
 
-        self::$installedModules = $discoveredModules;
-        return self::$installedModules;
+        $this->installedModules = $discoveredModules;
+        return $this->installedModules;
     }
 
     /**
@@ -221,6 +228,14 @@ class VendorModuleDetector implements ModuleDetectorInterface
                 try {
                     $moduleData = $this->parseModuleComposerJson($composerJsonPath, $packagePath, $vendor . '/' . $package);
                     if ($moduleData) {
+                        if (isset($modules[$moduleData['name']])) {
+                            throw new \RuntimeException(sprintf(
+                                'Multiple Composer packages declare the logical module name "%s": %s and %s.',
+                                $moduleData['name'],
+                                $modules[$moduleData['name']]['package'],
+                                $moduleData['package']
+                            ));
+                        }
                         $modules[$moduleData['name']] = $moduleData;
                     }
                 } catch (\JsonException $e) {
@@ -276,15 +291,17 @@ class VendorModuleDetector implements ModuleDetectorInterface
             return null;
         }
 
-        // Check for Flexi module metadata in extra.flexi-module
-        if (!isset($data['extra']['flexi-module']) || !is_array($data['extra']['flexi-module'])) {
+        // `extra.flexi` is the canonical format used by local and published modules.
+        // Keep `extra.flexi-module` readable for packages created with the legacy format.
+        $flexiModuleData = $data['extra']['flexi'] ?? $data['extra']['flexi-module'] ?? null;
+        if (!is_array($flexiModuleData)) {
             return null;
         }
 
-        $flexiModuleData = $data['extra']['flexi-module'];
-
         // Extract module name from flexi-module metadata or derive from package name
-        $moduleName = $flexiModuleData['name'] ?? $this->deriveModuleNameFromPackage($packageName);
+        $moduleName = $flexiModuleData['module-name']
+            ?? $flexiModuleData['name']
+            ?? $this->deriveModuleNameFromPackage($packageName);
 
         return [
             'name' => $this->normalizeModuleName($moduleName),
@@ -341,7 +358,7 @@ class VendorModuleDetector implements ModuleDetectorInterface
      */
     public static function clearCache(): void
     {
-        self::$installedModules = null;
+        ++self::$cacheGenerationCounter;
     }
 
     /**

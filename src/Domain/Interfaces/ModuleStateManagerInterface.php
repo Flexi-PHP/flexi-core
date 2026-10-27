@@ -79,7 +79,7 @@ interface ModuleStateManagerInterface
     public function initializeModuleState(
         string $moduleName,
         ModuleType $type,
-        bool $active = true,
+        bool $active = false,
         ?string $modifiedBy = null
     ): bool;
 

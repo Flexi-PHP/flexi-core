@@ -1,5 +1,7 @@
 # ✅ EXTRACTION COMPLETE: Logging & Session Modules
 
+> **Historical report:** This records extraction work from an earlier checkout. Module implementations may live in separate repositories; verify current contents before relying on the paths below. See [historical documentation](historical-documentation.md).
+
 ## Overview
 
 Successfully extracted `InFileLogRepository` and `NativeSessionStorage` from core infrastructure to dedicated, self-contained modules. Framework architecture now cleaner, more modular, and highly extensible.

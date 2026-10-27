@@ -6,6 +6,9 @@ namespace Flexi\Test\Application\UseCase;
 
 use Flexi\Application\Commands\ActivateModuleCommand;
 use Flexi\Application\UseCase\ActivateModule;
+use Flexi\Application\Services\ModuleActivationPreflightInterface;
+use Flexi\Contracts\Interfaces\EventBusInterface;
+use Flexi\Domain\Events\ModuleActivatedEvent;
 use Flexi\Domain\ValueObjects\ModuleInfo;
 use Flexi\Domain\ValueObjects\ModuleState;
 use Flexi\Domain\ValueObjects\ModuleType;
@@ -24,6 +27,10 @@ class ActivateModuleTest extends TestCase
     private $moduleDetector;
     /** @var ModuleEnvironmentManagerInterface&MockObject */
     private $envManager;
+    /** @var ModuleActivationPreflightInterface&MockObject */
+    private $preflight;
+    /** @var EventBusInterface&MockObject */
+    private $eventBus;
     private ActivateModule $useCase;
 
     protected function setUp(): void
@@ -31,10 +38,16 @@ class ActivateModuleTest extends TestCase
         parent::setUp();
 
         $this->stateManager = $this->createMock(ModuleStateManagerInterface::class);
+        $this->stateManager->method('initializeModuleState')->willReturn(true);
         $this->moduleDetector = $this->createMock(HybridModuleDetector::class);
         $this->envManager = $this->createMock(ModuleEnvironmentManagerInterface::class);
+        $this->preflight = $this->createMock(ModuleActivationPreflightInterface::class);
+        $this->eventBus = $this->createMock(EventBusInterface::class);
+        $this->eventBus->method('dispatch')->willReturnCallback(static function ($event) {
+            return $event;
+        });
 
-        $this->useCase = new ActivateModule($this->stateManager, $this->moduleDetector, $this->envManager);
+        $this->useCase = new ActivateModule($this->stateManager, $this->moduleDetector, $this->envManager, $this->preflight, $this->eventBus);
     }
 
     public function testHandleFailsWhenModuleNameMissing(): void
@@ -112,6 +125,25 @@ class ActivateModuleTest extends TestCase
         $this->assertSame("Failed to activate module 'analytics'", $payload['error']);
     }
 
+    public function testHandleDoesNotPersistActivationWhenPreflightFails(): void
+    {
+        $moduleInfo = $this->createModuleInfo(ModuleType::vendor());
+        $this->moduleDetector->method('getModuleInfo')->willReturn($moduleInfo);
+        $this->stateManager->method('isModuleActive')->willReturn(false);
+        $this->preflight->expects($this->once())
+            ->method('validate')
+            ->with($moduleInfo)
+            ->willThrowException(new \RuntimeException('invalid route schema'));
+        $this->stateManager->expects($this->never())->method('activateModule');
+        $this->eventBus->expects($this->never())->method('dispatch');
+
+        $payload = $this->decode($this->useCase->handle(new ActivateModuleCommand(['module_name' => 'analytics'])));
+
+        $this->assertFalse($payload['success']);
+        $this->assertSame('preflight_failed', $payload['status']);
+        $this->assertStringContainsString('invalid route schema', $payload['error']);
+    }
+
     public function testHandleActivatesModuleAndUpdatesEnvironment(): void
     {
         $moduleInfo = $this->createModuleInfo(ModuleType::mixed(), [
@@ -132,7 +164,11 @@ class ActivateModuleTest extends TestCase
 
         $this->moduleDetector->method('getModuleInfo')->with('analytics')->willReturn($moduleInfo);
         $this->stateManager->method('isModuleActive')->with('analytics')->willReturn(false);
+        $this->preflight->expects($this->once())->method('validate')->with($moduleInfo);
         $this->stateManager->expects($this->once())->method('activateModule')->with('analytics', 'tester')->willReturn(true);
+        $this->eventBus->expects($this->once())->method('dispatch')->with($this->isInstanceOf(ModuleActivatedEvent::class))->willReturnCallback(static function ($event) {
+            return $event;
+        });
         $this->stateManager->method('getModuleState')->with('analytics')->willReturn($state);
 
         $this->envManager
@@ -178,6 +214,7 @@ class ActivateModuleTest extends TestCase
 
         $this->moduleDetector->method('getModuleInfo')->willReturn($moduleInfo);
         $this->stateManager->method('isModuleActive')->willReturn(false);
+        $this->preflight->expects($this->once())->method('validate')->with($moduleInfo);
         $this->stateManager->method('activateModule')->willReturn(true);
         $this->stateManager->method('getModuleState')->willReturn($state);
 

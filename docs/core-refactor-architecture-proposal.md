@@ -1,5 +1,7 @@
 # Propuesta de Refactorización de la Arquitectura del Core
 
+> **Historical proposal:** This document predates the current modular architecture and is not an implementation guide. See [historical documentation](historical-documentation.md) and the current module and configuration references linked there.
+
 **Fecha:** 27 de octubre de 2025
 **Objetivo:** Asegurar que el core contenga SOLO clases necesarias para orquestar la lógica del framework, mientras que clases genéricas se trasladan a `Contracts` o a módulos específicos.
 

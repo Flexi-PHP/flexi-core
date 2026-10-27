@@ -66,6 +66,90 @@ class ConfigurationFilesProviderTest extends TestCase
         $this->assertSame([$coreRoutesPath, $moduleRoutesPath], $files);
     }
 
+    public function testConfigurationFilesAreOrderedByModuleName(): void
+    {
+        $zulu = $this->createModule('Zulu', ['routes' => '{"routes":[]}']);
+        $alpha = $this->createModule('Alpha', ['routes' => '{"routes":[]}']);
+
+        $this->moduleDetector->method('getAllModules')->willReturn([$zulu, $alpha]);
+        $this->stateManager->method('isModuleActive')->willReturn(true);
+
+        $files = $this->provider->getConfigurationFiles(ConfigurationType::routes());
+
+        $this->assertSame([
+            realpath(dirname(__DIR__, 3) . '/src/Config/routes.json'),
+            realpath($alpha->getPath() . '/Config/routes.json'),
+            realpath($zulu->getPath() . '/Config/routes.json'),
+        ], $files);
+    }
+
+    public function testRootComposerOrderOverridesAlphabeticalOrderForActiveModules(): void
+    {
+        $zulu = $this->createModule('Zulu', ['routes' => '{"routes":[]}']);
+        $alpha = $this->createModule('Alpha', ['routes' => '{"routes":[]}']);
+        $beta = $this->createModule('Beta', ['routes' => '{"routes":[]}']);
+        $inactive = $this->createModule('Inactive', ['routes' => '{"routes":[]}']);
+
+        file_put_contents($this->temporaryModulesPath . '/composer.json', json_encode([
+            'extra' => ['flexi' => ['module-load-order' => ['zulu', 'Inactive', 'Alpha', 'FutureModule']]],
+        ], JSON_THROW_ON_ERROR));
+        $this->moduleDetector->method('getAllModules')->willReturn([$alpha, $inactive, $beta, $zulu]);
+        $this->stateManager->method('isModuleActive')->willReturnCallback(function (string $name): bool {
+            return $name !== 'Inactive';
+        });
+        $provider = new ConfigurationFilesProvider(
+            $this->stateManager,
+            $this->moduleDetector,
+            $this->temporaryModulesPath
+        );
+
+        $files = $provider->getConfigurationFiles(ConfigurationType::routes(), false);
+
+        $expectedFiles = [
+            realpath($zulu->getPath() . '/Config/routes.json'),
+            realpath($alpha->getPath() . '/Config/routes.json'),
+            realpath($beta->getPath() . '/Config/routes.json'),
+        ];
+        $this->assertSame($expectedFiles, $files);
+
+        file_put_contents($this->temporaryModulesPath . '/composer.json', json_encode([
+            'extra' => ['flexi' => ['module-load-order' => ['Alpha', 'Zulu']]],
+        ], JSON_THROW_ON_ERROR));
+        $this->assertSame($expectedFiles, $provider->getConfigurationFiles(ConfigurationType::routes(), false));
+    }
+
+    public function testRootComposerOrderMustContainUniqueNonEmptyNames(): void
+    {
+        file_put_contents($this->temporaryModulesPath . '/composer.json', json_encode([
+            'extra' => ['flexi' => ['module-load-order' => ['Auth', 'auth']]],
+        ], JSON_THROW_ON_ERROR));
+        $provider = new ConfigurationFilesProvider(
+            $this->stateManager,
+            $this->moduleDetector,
+            $this->temporaryModulesPath
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('contains duplicate module name "auth"');
+        $provider->getConfigurationFiles(ConfigurationType::routes(), false);
+    }
+
+    public function testRootComposerOrderMustBeASequentialList(): void
+    {
+        file_put_contents($this->temporaryModulesPath . '/composer.json', json_encode([
+            'extra' => ['flexi' => ['module-load-order' => ['first' => 'Auth']]],
+        ], JSON_THROW_ON_ERROR));
+        $provider = new ConfigurationFilesProvider(
+            $this->stateManager,
+            $this->moduleDetector,
+            $this->temporaryModulesPath
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('must be a sequential list of module names');
+        $provider->getConfigurationFiles(ConfigurationType::routes(), false);
+    }
+
     public function testGetConfigurationFilesCanExcludeCoreConfiguration(): void
     {
         $module = $this->createModule('Blog', ['routes' => '{"route": "blog"}']);
@@ -146,6 +230,54 @@ class ConfigurationFilesProviderTest extends TestCase
         $result = $this->provider->getModuleConfigurationFile('Any', ConfigurationType::routes());
 
         $this->assertNull($result);
+    }
+
+    public function testGetConfigurationFilesUsesComposerDeclaredPaths(): void
+    {
+        $modulePath = $this->temporaryModulesPath . '/Auth';
+        $configPath = $modulePath . '/config';
+        $this->createDirectory($configPath);
+        file_put_contents($configPath . '/routes.json', '{"routes":[]}');
+
+        $module = new ModuleInfo(
+            'Auth',
+            'cubadevops/flexi-module-auth',
+            ModuleType::vendor(),
+            $modulePath,
+            '1.0.0',
+            false,
+            ['flexi' => ['config-files' => ['config/routes.json']]]
+        );
+        $this->moduleDetector->method('getAllModules')->willReturn([$module]);
+        $this->stateManager->method('isModuleActive')->willReturn(true);
+
+        $files = $this->provider->getConfigurationFiles(ConfigurationType::routes(), false);
+
+        $this->assertSame([realpath($configPath . '/routes.json')], $files);
+        $this->assertSame(
+            realpath($configPath . '/routes.json'),
+            $this->provider->getModuleConfigurationFile('Auth', ConfigurationType::routes())
+        );
+    }
+
+    public function testGetModuleConfigurationFileRejectsPathsOutsideModule(): void
+    {
+        $modulePath = $this->temporaryModulesPath . '/Unsafe';
+        $this->createDirectory($modulePath);
+        file_put_contents($this->temporaryModulesPath . '/routes.json', '{"routes":[]}');
+
+        $module = new ModuleInfo(
+            'Unsafe',
+            'vendor/unsafe',
+            ModuleType::local(),
+            $modulePath,
+            null,
+            false,
+            ['flexi' => ['config-files' => ['../routes.json']]]
+        );
+        $this->moduleDetector->method('getAllModules')->willReturn([$module]);
+
+        $this->assertNull($this->provider->getModuleConfigurationFile('Unsafe', ConfigurationType::routes()));
     }
 
     public function testConfigurationTypeHelpersRemainConsistent(): void

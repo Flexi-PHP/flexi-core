@@ -1,5 +1,7 @@
 # Analysis: InFileLogRepository & NativeSessionStorage Extraction
 
+> **Superseded analysis:** The extraction decision has since moved beyond this in-progress note; the referenced implementations are no longer in the core tree. See [historical documentation](historical-documentation.md) for current module references.
+
 **Date:** October 27, 2025
 **Status:** 🔍 ANALYSIS IN PROGRESS
 

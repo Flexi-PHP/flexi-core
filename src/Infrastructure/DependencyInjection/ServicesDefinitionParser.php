@@ -21,12 +21,14 @@ class ServicesDefinitionParser
     private const ERROR_FILE_NOT_FOUND = 'Service file not found: %s';
 
     private CacheInterface $cache;
+    private ConfigurationValidator $configurationValidator;
     private array $serviceDefinitions = [];
     private array $filesProcessed = [];
 
     public function __construct(CacheInterface $cache)
     {
         $this->cache = $cache;
+        $this->configurationValidator = new ConfigurationValidator();
         $this->filesProcessed = $cache->get(self::SERVICE_DEFINITION_FILES_KEY, []);
     }
 
@@ -38,9 +40,11 @@ class ServicesDefinitionParser
         $filename = $this->normalize($filename);
 
         $this->ensureFileExists($filename);
+        $this->configurationValidator->validateFile('services', $filename);
 
-        if ($this->isFileProcessed($filename)) {
-            return $this->getCachedServices($filename);
+        $fileCacheKey = $this->getFileCacheKey($filename);
+        if ($this->isFileProcessed($filename) && $this->cache->has($fileCacheKey)) {
+            return $this->cache->get($fileCacheKey, []);
         }
 
         $definitions = $this->readJsonFile($filename);
@@ -72,16 +76,6 @@ class ServicesDefinitionParser
     }
 
     /**
-     * Retrieves cached services for a processed file.
-     */
-    private function getCachedServices(string $filename): array
-    {
-        $fileCacheKey = $this->getFileCacheKey($filename);
-
-        return $this->cache->get($fileCacheKey, []);
-    }
-
-    /**
      * Processes the service definitions from the file.
      */
     private function processDefinitions(array $definitions, string $filename): array
@@ -89,6 +83,13 @@ class ServicesDefinitionParser
         $services = [];
 
         foreach ($definitions['services'] as $service) {
+            if (array_key_exists($service['name'], $services)) {
+                throw new \RuntimeException(sprintf(
+                    'Service ID "%s" is defined more than once in %s.',
+                    $service['name'],
+                    $filename
+                ));
+            }
             if (isset($service['alias'])) {
                 $services[$service['name']] = $service['alias'];
             } elseif (isset($service['factory']) || isset($service['class'])) {
@@ -123,6 +124,6 @@ class ServicesDefinitionParser
      */
     private function getFileCacheKey(string $filename): string
     {
-        return self::SERVICES_CACHE_KEY_PREFIX.md5($filename);
+        return self::SERVICES_CACHE_KEY_PREFIX.md5($filename.hash_file('sha256', $filename));
     }
 }

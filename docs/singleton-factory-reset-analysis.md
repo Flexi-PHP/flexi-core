@@ -1,5 +1,7 @@
 # Análisis: Reset de Singleton en ContainerFactory
 
+> **Superseded analysis:** The current `ContainerFactory` is not a singleton and has no reset API. See [service definitions](service-definitions.md) and [historical documentation](historical-documentation.md).
+
 ## Problema Identificado
 
 Durante la revisión del PR, se identificó que usar **reflexión** para resetear singletons en tests indica un problema de diseño:

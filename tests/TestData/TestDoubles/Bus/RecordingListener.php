@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace Flexi\Test\TestData\TestDoubles\Bus;
 
-use Flexi\Contracts\Classes\PlainTextMessage;
-use Flexi\Contracts\Interfaces\DTOInterface;
 use Flexi\Contracts\Interfaces\EventInterface;
 use Flexi\Contracts\Interfaces\EventListenerInterface;
-use Flexi\Contracts\Interfaces\MessageInterface;
 
 class RecordingListener implements EventListenerInterface
 {
@@ -23,13 +20,9 @@ class RecordingListener implements EventListenerInterface
         $this->callback = $callback;
     }
 
-    public function handle(DTOInterface $dto): MessageInterface
+    public function handle(EventInterface $event): void
     {
-        if ($dto instanceof EventInterface) {
-            $this->handleEvent($dto);
-        }
-
-        return new PlainTextMessage('Event handled');
+        $this->handleEvent($event);
     }
 
     public function handleEvent(EventInterface $event): void

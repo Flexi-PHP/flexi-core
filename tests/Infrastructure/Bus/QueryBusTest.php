@@ -74,6 +74,21 @@ class QueryBusTest extends TestCase
         $this->assertEquals('message', $message->get('body'));
     }
 
+    public function testExecuteResolvesHandlerServiceThroughContainer(): void
+    {
+        $handler = $this->createMock(TestQueryHandler::class);
+        $handler->expects($this->once())->method('handle')->with($this->isInstanceOf(TestQuery::class))
+            ->willReturn(new PlainTextMessage('service'));
+        $this->container->expects($this->once())->method('has')->with(TestQueryHandler::class)->willReturn(true);
+        $this->container->expects($this->once())->method('get')->with(TestQueryHandler::class)->willReturn($handler);
+        $this->class_factory->expects($this->never())->method('build');
+        $this->event_bus->method('dispatch')->willReturnSelf();
+
+        $message = $this->queryBus->execute(new TestQuery());
+
+        $this->assertSame('service', $message->get('body'));
+    }
+
     public function testGetHandler(): void
     {
         $this->assertEquals(TestQueryHandler::class, $this->queryBus->getHandler(TestQuery::class));

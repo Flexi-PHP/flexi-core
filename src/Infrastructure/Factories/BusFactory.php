@@ -113,9 +113,51 @@ class BusFactory
     {
         $handlerFiles = $this->config_files_provider->getConfigurationFiles($configType);
 
+        $registeredIds = [];
+        $registeredAliases = [];
         foreach ($handlerFiles as $file) {
-            $handlers = $this->handlers_parser->parse($file);
+            $handlers = $this->handlers_parser->parse($file, $configType);
             foreach ($handlers as $handler) {
+                $id = $handler['id'];
+                if (isset($registeredIds[$id])) {
+                    throw new \RuntimeException(sprintf(
+                        'Handler ID "%s" is defined in both %s and %s.',
+                        $id,
+                        $registeredIds[$id],
+                        $file
+                    ));
+                }
+                if (isset($registeredAliases[$id])) {
+                    throw new \RuntimeException(sprintf(
+                        'Handler ID "%s" in %s conflicts with alias declared in %s.',
+                        $id,
+                        $file,
+                        $registeredAliases[$id]
+                    ));
+                }
+                $registeredIds[$id] = $file;
+
+                $alias = $handler['cli_alias'] ?? null;
+                if ($alias !== null) {
+                    if (isset($registeredAliases[$alias])) {
+                        throw new \RuntimeException(sprintf(
+                            'Handler alias "%s" is defined in both %s and %s.',
+                            $alias,
+                            $registeredAliases[$alias],
+                            $file
+                        ));
+                    }
+                    if (isset($registeredIds[$alias])) {
+                        throw new \RuntimeException(sprintf(
+                            'Handler alias "%s" in %s conflicts with handler ID declared in %s.',
+                            $alias,
+                            $file,
+                            $registeredIds[$alias]
+                        ));
+                    }
+                    $registeredAliases[$alias] = $file;
+                }
+
                 $bus->register($handler['id'], $handler['handler'], $handler['cli_alias'] ?? null);
             }
         }

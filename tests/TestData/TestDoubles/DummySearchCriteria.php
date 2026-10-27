@@ -4,17 +4,34 @@ declare(strict_types=1);
 
 namespace Flexi\Test\TestData\TestDoubles;
 
+use Flexi\Contracts\Classes\Criteria\Filters;
+use Flexi\Contracts\Classes\Criteria\Order;
 use Flexi\Contracts\Interfaces\CriteriaInterface;
 
 class DummySearchCriteria implements CriteriaInterface
 {
-    public function __toString(): string
+    public function filters(): Filters
     {
-        return __CLASS__;
+        return new Filters([]);
     }
 
-    public function apply($request)
+    public function order(): Order
     {
-        return $request;
+        return new Order('id');
+    }
+
+    public function limit(): ?int
+    {
+        return null;
+    }
+
+    public function offset(): ?int
+    {
+        return null;
+    }
+
+    public function pointer(): ?int
+    {
+        return null;
     }
 }

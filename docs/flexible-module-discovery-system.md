@@ -1,5 +1,7 @@
 # Nuevo Sistema de Descubrimiento de Módulos
 
+> **Legacy design note:** This document describes the historical `extra.flexi-module` format. New modules must use the canonical `extra.flexi` schema in [Module Manifest](module-manifest.md). The legacy format is retained only as migration context.
+
 ## Resumen de Cambios
 
 Se ha implementado un sistema de descubrimiento de módulos más flexible basado en metadatos del `composer.json` que elimina la dependencia de prefijos específicos como "cubadevops/".

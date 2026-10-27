@@ -1,3 +1,10 @@
 [
-
+  {
+    "event": "core.moduleActivated",
+    "listeners": ["Flexi\\Infrastructure\\Listeners\\ModuleCacheInvalidationListener"]
+  },
+  {
+    "event": "core.moduleDeactivated",
+    "listeners": ["Flexi\\Infrastructure\\Listeners\\ModuleCacheInvalidationListener"]
+  }
 ]

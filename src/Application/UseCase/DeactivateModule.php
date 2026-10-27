@@ -6,6 +6,8 @@ namespace Flexi\Application\UseCase;
 
 use Flexi\Domain\Interfaces\ModuleStateManagerInterface;
 use Flexi\Domain\Interfaces\ModuleEnvironmentManagerInterface;
+use Flexi\Domain\Events\ModuleDeactivatedEvent;
+use Flexi\Contracts\Interfaces\EventBusInterface;
 use Flexi\Infrastructure\Classes\HybridModuleDetector;
 use Flexi\Contracts\Classes\PlainTextMessage;
 use Flexi\Contracts\Interfaces\DTOInterface;
@@ -23,15 +25,18 @@ class DeactivateModule implements HandlerInterface
     private ModuleStateManagerInterface $stateManager;
     private HybridModuleDetector $moduleDetector;
     private ModuleEnvironmentManagerInterface $envManager;
+    private EventBusInterface $eventBus;
 
     public function __construct(
         ModuleStateManagerInterface $stateManager,
         HybridModuleDetector $moduleDetector,
-        ModuleEnvironmentManagerInterface $envManager
+        ModuleEnvironmentManagerInterface $envManager,
+        EventBusInterface $eventBus
     ) {
         $this->stateManager = $stateManager;
         $this->moduleDetector = $moduleDetector;
         $this->envManager = $envManager;
+        $this->eventBus = $eventBus;
     }
 
     /**
@@ -117,6 +122,12 @@ class DeactivateModule implements HandlerInterface
         // Add environment warnings if any
         if (!empty($envWarnings)) {
             $response['env_warnings'] = $envWarnings;
+        }
+
+        try {
+            $this->eventBus->dispatch(new ModuleDeactivatedEvent($moduleInfo, $modifiedBy));
+        } catch (\Throwable $exception) {
+            $response['event_warnings'][] = 'Deactivation succeeded, but a lifecycle listener failed: ' . $exception->getMessage();
         }
 
         // Add conflict info if applicable

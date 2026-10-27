@@ -40,6 +40,12 @@ class CommandBus implements BusInterface
         string $handler,
         ?string $cli_alias = null
     ): void {
+        if (isset($this->commands[$identifier]) || isset($this->aliases[$identifier])) {
+            throw new \InvalidArgumentException(sprintf('Handler ID "%s" is already registered.', $identifier));
+        }
+        if ($cli_alias !== null && ($cli_alias === $identifier || isset($this->commands[$cli_alias]) || isset($this->aliases[$cli_alias]))) {
+            throw new \InvalidArgumentException(sprintf('Handler alias "%s" is already registered or conflicts with a handler ID.', $cli_alias));
+        }
         $this->commands[$identifier] = $handler;
         if ($cli_alias !== null) {
             $this->registerCliAlias($cli_alias, $handler);
@@ -48,6 +54,9 @@ class CommandBus implements BusInterface
 
     public function registerCliAlias(string $alias, string $handler): void
     {
+        if (isset($this->aliases[$alias]) || isset($this->commands[$alias])) {
+            throw new \InvalidArgumentException(sprintf('Handler alias "%s" is already registered or conflicts with a handler ID.', $alias));
+        }
         $this->aliases[$alias] = $handler;
     }
 
@@ -62,8 +71,14 @@ class CommandBus implements BusInterface
 
         $handler = $this->getHandler($identifier);
 
-        /** @var HandlerInterface $handler_obj */
-        $handler_obj = $this->class_factory->build($this->container, $handler);
+        $handler_obj = $this->resolveHandler($handler);
+        if (!$handler_obj instanceof HandlerInterface) {
+            throw new \RuntimeException(sprintf(
+                'Command handler "%s" must implement %s.',
+                $handler,
+                HandlerInterface::class
+            ));
+        }
 
         $event_before = new Event('core.command.before_execute', __CLASS__, [
             'command' => $identifier,
@@ -76,6 +91,13 @@ class CommandBus implements BusInterface
         $this->event_bus->dispatch($event_after);
 
         return $response;
+    }
+
+    private function resolveHandler(string $handler): object
+    {
+        return $this->container->has($handler)
+            ? $this->container->get($handler)
+            : $this->class_factory->build($this->container, $handler);
     }
 
     public function getHandler(string $identifier): string

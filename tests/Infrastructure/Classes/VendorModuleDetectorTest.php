@@ -105,6 +105,36 @@ final class VendorModuleDetectorTest extends TestCase
         $this->assertCount(1, $cacheManager->cachedPayload);
     }
 
+    public function testScanVendorReadsPublishedFlexiMetadataFormat(): void
+    {
+        $cacheManager = new FakeCacheManager(false, []);
+        $detector = new VendorModuleDetector($cacheManager, $this->vendorDir);
+
+        $this->createVendorPackage(
+            'cubadevops',
+            'flexi-module-auth',
+            [
+                'name' => 'cubadevops/flexi-module-auth',
+                'version' => '1.0.0',
+                'type' => 'flexi-module',
+                'extra' => [
+                    'flexi' => [
+                        'module-name' => 'Auth',
+                        'config-files' => ['Config/routes.json', 'Config/services.json'],
+                    ],
+                ],
+            ]
+        );
+
+        $modules = $detector->getAllModules();
+
+        $this->assertArrayHasKey('Auth', $modules);
+        $this->assertSame(
+            ['module-name' => 'Auth', 'config-files' => ['Config/routes.json', 'Config/services.json']],
+            $modules['Auth']->getMetadataValue('flexi')
+        );
+    }
+
     public function testRefreshModulesInvalidatesCacheAndClearsStaticState(): void
     {
         $cachedModules = [
@@ -145,7 +175,7 @@ final class VendorModuleDetectorTest extends TestCase
         mkdir($packagePath);
 
         $composerJson = $composerData;
-        if (!isset($composerJson['extra']['flexi-module']['name'])) {
+        if (isset($composerJson['extra']['flexi-module']) && !isset($composerJson['extra']['flexi-module']['name'])) {
             // Derive module name behaviour exercise
             unset($composerJson['extra']['flexi-module']['name']);
         }

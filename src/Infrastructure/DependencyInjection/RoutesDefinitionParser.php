@@ -19,11 +19,13 @@ class RoutesDefinitionParser
     private const ERROR_FILE_NOT_FOUND = 'Routes file not found: %s';
 
     private CacheInterface $cache;
+    private ConfigurationValidator $configurationValidator;
     private array $filesProcessed = [];
 
     public function __construct(CacheInterface $cache)
     {
         $this->cache = $cache;
+        $this->configurationValidator = new ConfigurationValidator();
         $this->filesProcessed = $cache->get(self::ROUTE_DEFINITION_FILES_KEY, []);
     }
 
@@ -37,9 +39,11 @@ class RoutesDefinitionParser
         $filename = $this->normalize($filename);
 
         $this->ensureFileExists($filename);
+        $this->configurationValidator->validateFile('routes', $filename);
 
-        if ($this->isFileProcessed($filename)) {
-            return $this->getCachedRoutes($filename);
+        $fileCacheKey = $this->getFileCacheKey($filename);
+        if ($this->isFileProcessed($filename) && $this->cache->has($fileCacheKey)) {
+            return $this->cache->get($fileCacheKey, []);
         }
 
         $definitions = $this->readJsonFile($filename);
@@ -71,18 +75,6 @@ class RoutesDefinitionParser
     }
 
     /**
-     * Retrieves cached routes for a processed file.
-     *
-     * @return Route[]
-     */
-    private function getCachedRoutes(string $filename): array
-    {
-        $fileCacheKey = $this->getFileCacheKey($filename);
-
-        return $this->cache->get($fileCacheKey, []);
-    }
-
-    /**
      * Processes the route definitions from the file.
      *
      * @return Route[]
@@ -98,7 +90,8 @@ class RoutesDefinitionParser
                 $defined_route['controller'],
                 $defined_route['method'],
                 $defined_route['parameters'] ?? [],
-                $defined_route['middlewares'] ?? []
+                $defined_route['middlewares'] ?? [],
+                $defined_route['overrides'] ?? null
             );
 
             $routes[] = $route;
@@ -131,6 +124,6 @@ class RoutesDefinitionParser
      */
     private function getFileCacheKey(string $filename): string
     {
-        return self::ROUTES_CACHE_KEY_PREFIX.md5($filename);
+        return self::ROUTES_CACHE_KEY_PREFIX.md5($filename.hash_file('sha256', $filename));
     }
 }

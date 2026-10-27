@@ -4,10 +4,14 @@ vendor
 var
 modules/*
 !modules/.gitkeep
+!modules/*/
+modules/*/**
+!modules/*/**
+modules/example-auth/
+modules/example-auth/**
 xdebug
 *.cache
 *.log
 .idea
 .vscode
-*.lock
 .DS_Store

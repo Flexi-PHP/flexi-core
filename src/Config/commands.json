@@ -34,6 +34,11 @@
       "id": "Flexi\\Application\\Commands\\UpdateModuleEnvironmentCommand",
       "cli_alias": "modules:env-update",
       "handler": "Flexi\\Application\\UseCase\\UpdateModuleEnvironment"
+    },
+    {
+      "id": "Flexi\\Application\\Commands\\PublishModuleCommand",
+      "cli_alias": "modules:publish",
+      "handler": "Flexi\\Application\\UseCase\\PublishModule"
     }
   ]
 }

@@ -172,6 +172,20 @@ class EventBusTest extends TestCase
         );
     }
 
+    public function testDispatchResolvesListenerServiceThroughContainer(): void
+    {
+        $listener = new RecordingListener();
+        $this->container->expects($this->once())->method('has')->with('listener.service')->willReturn(true);
+        $this->container->expects($this->once())->method('get')->with('listener.service')->willReturn($listener);
+        $this->builder->expects($this->never())->method('build');
+
+        $bus = $this->createBus();
+        $bus->register('order.created', 'listener.service');
+        $bus->dispatch(new SampleEvent('order.created'));
+
+        $this->assertCount(1, $listener->received);
+    }
+
     public function testDispatchWithoutListenersReturnsEvent(): void
     {
         $this->dispatchMode = 0;
@@ -202,6 +216,25 @@ class EventBusTest extends TestCase
             }));
 
         $bus->dispatch(new SampleEvent('order.created'));
+    }
+
+    public function testSpecificListenersKeepRegistrationOrderAndRunBeforeWildcardListeners(): void
+    {
+        $events = [];
+        $listeners = [
+            new RecordingListener(static function () use (&$events): void { $events[] = 'specific.first'; }),
+            new RecordingListener(static function () use (&$events): void { $events[] = 'specific.second'; }),
+            new RecordingListener(static function () use (&$events): void { $events[] = 'wildcard'; }),
+        ];
+        $this->builder->expects($this->exactly(3))->method('build')->willReturnOnConsecutiveCalls(...$listeners);
+
+        $bus = $this->createBus();
+        $bus->register('order.created', 'specific.first');
+        $bus->register('order.created', 'specific.second');
+        $bus->register('*', 'wildcard');
+        $bus->dispatch(new SampleEvent('order.created'));
+
+        $this->assertSame(['specific.first', 'specific.second', 'wildcard'], $events);
     }
 
     public function testDispatchSkipsBuildingWhenEventIsNotEventInterface(): void

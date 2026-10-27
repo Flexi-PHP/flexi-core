@@ -53,6 +53,26 @@ class CliInputParserTest extends TestCase
         $this->assertEquals(CliType::COMMAND, $result->getType());
     }
 
+    public function testParseRegisteredModuleCommandAndHyphenatedModuleName(): void
+    {
+        $input = ['console', '--command', 'modules:activate', 'module_name=example-auth'];
+        $result = CliInputParser::parse($input);
+
+        $this->assertSame('modules:activate', $result->getCommandName());
+        $this->assertSame(['module_name' => 'example-auth'], $result->getArguments());
+        $this->assertSame(CliType::COMMAND, $result->getType());
+    }
+
+    public function testParseVersionAndHelpValues(): void
+    {
+        $input = ['console', '-c', 'modules:env-update', 'module_name=example-auth', 'version=1.2.3', '--help'];
+        $result = CliInputParser::parse($input);
+
+        $this->assertSame('modules:env-update', $result->getCommandName());
+        $this->assertSame(['module_name' => 'example-auth', 'version' => '1.2.3'], $result->getArguments());
+        $this->assertTrue($result->showHelp());
+    }
+
     public function testParseEventType(): void
     {
         $input = ['console', '--event', 'module-installed', 'module=auth', 'timestamp=123456'];

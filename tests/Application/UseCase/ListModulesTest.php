@@ -32,6 +32,7 @@ class ListModulesTest extends TestCase
 
         // Create mocks for dependencies
         $this->stateManager = $this->createMock(ModuleStateManagerInterface::class);
+        $this->stateManager->method('syncWithDiscoveredModules')->willReturn([]);
         $this->moduleDetector = $this->createMock(ModuleDetectorInterface::class);
         $this->moduleDetector->method('getModuleStatistics')->willReturn([]);
 
@@ -67,6 +68,14 @@ class ListModulesTest extends TestCase
         $this->assertEquals(0, $response['total']);
         $this->assertEquals(0, $response['active']); // UseCase returns active/inactive, not installed
         $this->assertEquals([], $response['modules']);
+    }
+
+    public function testHandleSynchronizesPersistedStatesWithComposerDiscovery(): void
+    {
+        $this->moduleDetector->expects($this->once())->method('getAllModules')->willReturn([]);
+        $this->stateManager->expects($this->once())->method('syncWithDiscoveredModules')->with([])->willReturn([]);
+
+        $this->listModules->handle(new ListModulesCommand());
     }
 
     public function testHandleWithSingleModule(): void

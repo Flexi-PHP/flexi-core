@@ -18,11 +18,13 @@ class ListenersDefinitionParser
     private const ERROR_FILE_NOT_FOUND = 'Listeners file not found: %s';
 
     private CacheInterface $cache;
+    private ConfigurationValidator $configurationValidator;
     private array $filesProcessed = [];
 
     public function __construct(CacheInterface $cache)
     {
         $this->cache = $cache;
+        $this->configurationValidator = new ConfigurationValidator();
         $this->filesProcessed = $cache->get(self::LISTENERS_DEFINITION_FILES_KEY, []);
     }
 
@@ -34,9 +36,11 @@ class ListenersDefinitionParser
         $filename = $this->normalize($filename);
 
         $this->ensureFileExists($filename);
+        $this->configurationValidator->validateFile('listeners', $filename);
 
-        if ($this->isFileProcessed($filename)) {
-            return $this->getCachedListeners($filename);
+        $fileCacheKey = $this->getFileCacheKey($filename);
+        if ($this->isFileProcessed($filename) && $this->cache->has($fileCacheKey)) {
+            return $this->cache->get($fileCacheKey, []);
         }
 
         $definitions = $this->readJsonFile($filename);
@@ -68,28 +72,18 @@ class ListenersDefinitionParser
     }
 
     /**
-     * Retrieves cached listeners for a processed file.
-     */
-    private function getCachedListeners(string $filename): array
-    {
-        $fileCacheKey = $this->getFileCacheKey($filename);
-
-        return $this->cache->get($fileCacheKey, []);
-    }
-
-    /**
      * Processes the listener definitions from the file.
      */
     private function processDefinitions(array $definitions): array
     {
         $listeners = [];
 
-        if (isset($definitions['listeners'])) {
-            foreach ($definitions['listeners'] as $entry) {
+        foreach ($definitions as $eventDefinition) {
+            foreach ($eventDefinition['listeners'] as $handler) {
                 $listeners[] = [
-                    'event' => $entry['event'],
-                    'handler' => $entry['handler'],
-                    'priority' => $entry['priority'] ?? 0
+                    'event' => $eventDefinition['event'],
+                    'handler' => $handler,
+                    'priority' => 0
                 ];
             }
         }
@@ -121,6 +115,6 @@ class ListenersDefinitionParser
      */
     private function getFileCacheKey(string $filename): string
     {
-        return self::LISTENERS_CACHE_KEY_PREFIX.md5($filename);
+        return self::LISTENERS_CACHE_KEY_PREFIX.md5($filename.hash_file('sha256', $filename));
     }
 }

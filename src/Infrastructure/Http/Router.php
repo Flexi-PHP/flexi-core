@@ -14,7 +14,6 @@ use Flexi\Contracts\Interfaces\EventBusInterface;
 use Flexi\Contracts\Interfaces\ObjectBuilderInterface;
 use Flexi\Domain\Events\Event;
 use Flexi\Domain\Events\RouteNotFoundEvent;
-use Flexi\Contracts\Classes\HttpHandler;
 use Flexi\Infrastructure\Http\Route;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
@@ -22,6 +21,7 @@ use Psr\Container\NotFoundExceptionInterface;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
 class Router
@@ -56,8 +56,19 @@ class Router
      */
     public function addRoute(Route $route): self
     {
+        if ($this->routes_indexed_by_name->offsetExists($route->getName())) {
+            throw new \RuntimeException(sprintf('Route name "%s" is already registered.', $route->getName()));
+        }
+        $pathKey = $this->getPathKey($route->getPath(), $route->getMethod());
+        if ($this->routes_indexed_by_path->offsetExists($pathKey)) {
+            throw new \RuntimeException(sprintf(
+                'Route %s %s is already registered.',
+                $route->getMethod(),
+                $route->getPath()
+            ));
+        }
         $this->routes_indexed_by_name->add($route, $route->getName());
-        $this->routes_indexed_by_path->add($route, $route->getPath());
+        $this->routes_indexed_by_path->add($route, $pathKey);
 
         return $this;
     }
@@ -74,22 +85,52 @@ class Router
         $request_path = $request->getUri()->getPath();
         $event = new Event('core.onRequest', __CLASS__, ['request' => $request->getUri()->__toString()]);
         $this->event_bus->dispatch($event);
-        $this->assertThatRouteCollectionIsNotEmpty();
 
-        if (!$this->routes_indexed_by_path->offsetExists($request_path)) {
+        $requestMethod = $request->getMethod();
+        $methodKey = $this->getPathKey($request_path, $requestMethod);
+        if (!$this->routes_indexed_by_path->offsetExists($methodKey)) {
+            if ($this->hasPath($request_path)) {
+                return $this->createMethodNotAllowedResponse($request_path);
+            }
             return $this->handleNotFound($request, $request_path);
         }
         /** @var Route $route */
-        $route = $this->routes_indexed_by_path->get($request_path);
+        $route = $this->routes_indexed_by_path->get($methodKey);
 
-        return $this->processRequest($request, $route);
+        return $this->processRequest($request, $route, $requestMethod);
     }
 
-    private function assertThatRouteCollectionIsNotEmpty(): void
+    private function getPathKey(string $path, string $method): string
     {
-        if (!$this->routes_indexed_by_path->count()) {
-            throw new \RuntimeException('Define at least one route');
+        return $method.' '.$path;
+    }
+
+    private function hasPath(string $path): bool
+    {
+        foreach ($this->routes_indexed_by_path as $route) {
+            if ($route->getPath() === $path) {
+                return true;
+            }
         }
+
+        return false;
+    }
+
+    private function createMethodNotAllowedResponse(string $path, ?string $fallbackMethod = null): ResponseInterface
+    {
+        $allowedMethods = [];
+        foreach ($this->routes_indexed_by_path as $route) {
+            if ($route->getPath() === $path) {
+                $allowedMethods[] = $route->getMethod();
+            }
+        }
+        if (!$allowedMethods && $fallbackMethod !== null) {
+            $allowedMethods[] = $fallbackMethod;
+        }
+
+        return $this->response_factory
+            ->createResponse(405)
+            ->withHeader('Allow', implode(', ', $allowedMethods));
     }
 
     public function handleNotFound(
@@ -141,10 +182,15 @@ class Router
      */
     public function processRequest(
         ServerRequestInterface $request,
-        Route $route
+        Route $route,
+        ?string $requestMethod = null
     ): ResponseInterface {
-        $this->assertMethodIsAllowedForRoute($request, $route);
-        $this->checkRequiredParamsWereSend($route);
+        if (!$this->assertMethodIsAllowedForRoute($request, $route, $requestMethod)) {
+            return $this->createMethodNotAllowedResponse($route->getPath(), $route->getMethod());
+        }
+        if (!$this->checkRequiredParamsWereSend($route)) {
+            return $this->response_factory->createResponse(400);
+        }
 
         $response = $this->executeStack($route, $request);
 
@@ -156,14 +202,14 @@ class Router
 
     protected function assertMethodIsAllowedForRoute(
         ServerRequestInterface $request,
-        Route $route
-    ): void {
-        if ($request->getMethod() !== $route->getMethod()) {
-            throw new \RuntimeException("Method {$request->getMethod()} is not allowed for this route");
-        }
+        Route $route,
+        ?string $requestMethod = null
+    ): bool {
+        $requestMethod = $requestMethod ?? $request->getMethod();
+        return $requestMethod === $route->getMethod();
     }
 
-    protected function checkRequiredParamsWereSend(Route $route): void
+    protected function checkRequiredParamsWereSend(Route $route): bool
     {
         if ($route->hasParameters()) {
             foreach ($route->getParameters() as $parameter) {
@@ -172,10 +218,12 @@ class Router
                     && (!isset($_GET[$parameter['name']])
                         && !isset($_POST[$parameter['name']]))
                 ) {
-                    throw new \RuntimeException("Parameter '{$parameter['name']}' is required");
+                    return false;
                 }
             }
         }
+
+        return true;
     }
 
     /**
@@ -188,42 +236,40 @@ class Router
         Route $route,
         ServerRequestInterface $request
     ): ResponseInterface {
-        /** @var RequestHandlerInterface $handler */
         $handler = $this->class_factory->build(
             $this->container,
             $route->getController()
         );
+        if (!$handler instanceof RequestHandlerInterface) {
+            throw new \RuntimeException(sprintf(
+                'Route controller "%s" must implement PSR-15 RequestHandlerInterface.',
+                $route->getController()
+            ));
+        }
 
-        // Configure middlewares if the route has them
         if ($route->hasMiddlewares()) {
-            $handler = $this->configureMiddlewares($handler, $route);
+            $handler = new MiddlewarePipelineHandler($handler, $this->resolveMiddlewares($route));
         }
 
         return $handler->handle($request);
     }
 
-    /**
-     * Configures middlewares in the handler if it's an HttpHandler instance.
-     *
-     * @throws ContainerExceptionInterface
-     * @throws NotFoundExceptionInterface
-     * @throws \ReflectionException
-     */
-    private function configureMiddlewares(
-        RequestHandlerInterface $handler,
-        Route $route
-    ): RequestHandlerInterface {
-        if (!$handler instanceof HttpHandler) {
-            return $handler;
-        }
-
+    /** @return MiddlewareInterface[] */
+    private function resolveMiddlewares(Route $route): array
+    {
         $middlewares = [];
-        foreach ($route->getMiddlewares() as $middlewareClass) {
-            $middlewares[] = $this->class_factory->build($this->container, $middlewareClass);
+        foreach ($route->getMiddlewares() as $middlewareId) {
+            $middleware = $this->container->get($middlewareId);
+            if (!$middleware instanceof MiddlewareInterface) {
+                throw new \RuntimeException(sprintf(
+                    'Route middleware "%s" must resolve to PSR-15 MiddlewareInterface; got %s.',
+                    $middlewareId,
+                    is_object($middleware) ? get_class($middleware) : gettype($middleware)
+                ));
+            }
+            $middlewares[] = $middleware;
         }
 
-        $handler->setMiddlewares($middlewares);
-
-        return $handler;
+        return $middlewares;
     }
 }

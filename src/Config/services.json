@@ -104,6 +104,13 @@
       }
     },
     {
+      "name": "Flexi\\Application\\Services\\ComposerProcessInterface",
+      "class": {
+        "name": "Flexi\\Infrastructure\\Services\\NativeComposerProcess",
+        "arguments": []
+      }
+    },
+    {
       "name": "Flexi\\Domain\\Interfaces\\ModuleCacheManagerInterface",
       "class": {
         "name": "Flexi\\Infrastructure\\Classes\\ModuleCacheManager",
@@ -129,6 +136,31 @@
         "arguments": [
           "@Flexi\\Infrastructure\\Classes\\ModuleStateRepository"
         ]
+      }
+    },
+    {
+      "name": "Flexi\\Domain\\Interfaces\\CandidateConfigurationFilesProviderInterface",
+      "alias": "Flexi\\Domain\\Interfaces\\ConfigurationFilesProviderInterface"
+    },
+    {
+      "name": "Flexi\\Infrastructure\\DependencyInjection\\ServicesDefinitionParser",
+      "class": {
+        "name": "Flexi\\Infrastructure\\DependencyInjection\\ServicesDefinitionParser",
+        "arguments": ["@cache"]
+      }
+    },
+    {
+      "name": "Flexi\\Infrastructure\\DependencyInjection\\HandlersDefinitionParser",
+      "class": {
+        "name": "Flexi\\Infrastructure\\DependencyInjection\\HandlersDefinitionParser",
+        "arguments": ["@cache"]
+      }
+    },
+    {
+      "name": "Flexi\\Infrastructure\\DependencyInjection\\ListenersDefinitionParser",
+      "class": {
+        "name": "Flexi\\Infrastructure\\DependencyInjection\\ListenersDefinitionParser",
+        "arguments": ["@cache"]
       }
     },
     {
@@ -185,7 +217,35 @@
         "arguments": [
           "@Flexi\\Domain\\Interfaces\\ModuleStateManagerInterface",
           "@Flexi\\Infrastructure\\Classes\\HybridModuleDetector",
-          "@Flexi\\Domain\\Interfaces\\ModuleEnvironmentManagerInterface"
+          "@Flexi\\Domain\\Interfaces\\ModuleEnvironmentManagerInterface",
+          "@Flexi\\Application\\Services\\ModuleActivationPreflightInterface",
+          "@Flexi\\Contracts\\Interfaces\\EventBusInterface"
+        ]
+      }
+    },
+    {
+      "name": "Flexi\\Application\\UseCase\\PublishModule",
+      "class": {
+        "name": "Flexi\\Application\\UseCase\\PublishModule",
+        "arguments": [
+          "@Flexi\\Domain\\Interfaces\\ModuleDetectorInterface",
+          "@Flexi\\Domain\\Interfaces\\ModuleStateManagerInterface",
+          "@Flexi\\Application\\Services\\ComposerProcessInterface",
+          "./"
+        ]
+      }
+    },
+    {
+      "name": "Flexi\\Application\\Services\\ModuleActivationPreflightInterface",
+      "class": {
+        "name": "Flexi\\Application\\Services\\ModuleActivationPreflight",
+        "arguments": [
+          "@cache",
+          "@Flexi\\Contracts\\Interfaces\\ObjectBuilderInterface",
+          "@Flexi\\Infrastructure\\DependencyInjection\\ServicesDefinitionParser",
+          "@Flexi\\Domain\\Interfaces\\CandidateConfigurationFilesProviderInterface",
+          "@Flexi\\Domain\\Interfaces\\ModuleDetectorInterface",
+          "@Flexi\\Domain\\Interfaces\\ModuleStateManagerInterface"
         ]
       }
     },
@@ -196,7 +256,8 @@
         "arguments": [
           "@Flexi\\Domain\\Interfaces\\ModuleStateManagerInterface",
           "@Flexi\\Infrastructure\\Classes\\HybridModuleDetector",
-          "@Flexi\\Domain\\Interfaces\\ModuleEnvironmentManagerInterface"
+          "@Flexi\\Domain\\Interfaces\\ModuleEnvironmentManagerInterface",
+          "@Flexi\\Contracts\\Interfaces\\EventBusInterface"
         ]
       }
     },

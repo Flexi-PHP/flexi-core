@@ -1,5 +1,7 @@
 # Visualización de la Refactorización del Core
 
+> **Historical snapshot:** The diagram reflects an earlier architecture and is not authoritative for current class placement. See [historical documentation](historical-documentation.md) for current references.
+
 ## Diagrama: Arquitectura Hexagonal Actual
 
 ```text

@@ -13,6 +13,7 @@ use Flexi\Contracts\Interfaces\EventInterface;
 use Flexi\Contracts\Interfaces\EventListenerInterface;
 use Flexi\Contracts\Interfaces\ObjectBuilderInterface;
 use Flexi\Domain\Commands\NotFoundCommand;
+use Flexi\Domain\Events\SynchronousEventInterface;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -84,7 +85,7 @@ class EventBus implements EventBusInterface
             return $event;
         }
 
-        if ($this->asyncMode()) {
+        if (!$event instanceof SynchronousEventInterface && $this->asyncMode()) {
             $this->dispatchAsync($listeners, $event);
         } else {
             $this->notifyListeners($listeners, $event);
@@ -139,9 +140,22 @@ class EventBus implements EventBusInterface
             return;
         }
 
-        /** @var EventListenerInterface $listener_obj */
-        $listener_obj = $this->class_factory->build($this->container, $listener);
+        $listener_obj = $this->resolveListener($listener);
+        if (!$listener_obj instanceof EventListenerInterface) {
+            throw new \RuntimeException(sprintf(
+                'Event listener "%s" must implement %s.',
+                $listener,
+                EventListenerInterface::class
+            ));
+        }
         $listener_obj->handle($event);
+    }
+
+    private function resolveListener(string $listener): object
+    {
+        return $this->container->has($listener)
+            ? $this->container->get($listener)
+            : $this->class_factory->build($this->container, $listener);
     }
 
     private function closeBuffers(): void
@@ -198,7 +212,29 @@ class EventBus implements EventBusInterface
      */
     public function asyncMode(): bool
     {
-        return PHP_SAPI === 'cli' && ($this->configuration->has('dispatch_mode') && (int) $this->configuration->get('dispatch_mode'));
+        $requested = PHP_SAPI === 'cli'
+            && $this->configuration->has('dispatch_mode')
+            && (int) $this->configuration->get('dispatch_mode');
+        if (!$requested) {
+            return false;
+        }
+
+        if (!$this->supportsAsyncDispatch()) {
+            throw new \RuntimeException('Asynchronous event dispatch requires ext-pcntl; install the extension or set dispatch_mode=0.');
+        }
+
+        return true;
+    }
+
+    private function supportsAsyncDispatch(): bool
+    {
+        foreach (['pcntl_fork', 'pcntl_waitpid'] as $function) {
+            if (!function_exists(__NAMESPACE__.'\\'.$function) && !function_exists($function)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function getHandlersDefinition(bool $with_aliases = false): array

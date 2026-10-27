@@ -18,6 +18,7 @@ use Flexi\Infrastructure\Classes\InMemoryCache;
 use Flexi\Infrastructure\Classes\ObjectBuilder;
 use Flexi\Infrastructure\Classes\Configuration;
 use Flexi\Infrastructure\Classes\ConfigurationRepository;
+use Flexi\Infrastructure\Classes\ModuleDependencyValidator;
 use Flexi\Domain\Interfaces\ConfigurationFilesProviderInterface;
 use Flexi\Contracts\Interfaces\CacheInterface;
 use Flexi\Contracts\Interfaces\ObjectBuilderInterface;
@@ -49,9 +50,6 @@ class ContainerFactoryTest extends TestCase
         $this->cache
             ->method('get')
             ->willReturnCallback(function ($key, $default = null) {
-                if ($key === 'service_definitions') {
-                    return [];
-                }
                 return $default;
             });
 
@@ -60,10 +58,6 @@ class ContainerFactoryTest extends TestCase
             ->method('set')
             ->willReturn(true);
 
-        // Configure config files provider mock
-        $this->configFilesProvider
-            ->method('getConfigurationFiles')
-            ->willReturn([]);
     }
 
     public function testConstruct(): void
@@ -78,6 +72,25 @@ class ContainerFactoryTest extends TestCase
         $container = $factory->getInstance();
 
         $this->assertInstanceOf(Container::class, $container);
+    }
+
+    public function testValidatesModuleDependenciesBeforeBuildingContainer(): void
+    {
+        $validator = $this->getMockBuilder(ModuleDependencyValidator::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $validator->expects($this->once())->method('validate');
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+
+        $factory = new ContainerFactory(
+            $this->cache,
+            $this->objectBuilder,
+            $this->servicesDefinitionParser,
+            $this->configFilesProvider,
+            $validator
+        );
+
+        $this->assertInstanceOf(Container::class, $factory->getInstance());
     }
 
     public function testGetInstanceWithFile(): void
@@ -100,6 +113,119 @@ class ContainerFactoryTest extends TestCase
         $container = $factory->getInstance();
 
         $this->assertInstanceOf(Container::class, $container);
+    }
+
+    public function testServiceDecoratorReplacesTargetAndReceivesInnerService(): void
+    {
+        $files = ['/modules/Mailer/Config/services.json'];
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+        $this->configFilesProvider->expects($this->once())->method('getConfigurationFiles')->willReturn($files);
+        $this->servicesDefinitionParser->method('parse')->with($files[0])->willReturn([
+            'mailer' => ['class' => ['name' => ContainerFactoryBaseMailer::class]],
+            'logged_mailer' => [
+                'decorates' => 'mailer',
+                'class' => ['name' => ContainerFactoryLoggedMailer::class, 'arguments' => ['@.inner']],
+            ],
+            'audited_mailer' => [
+                'decorates' => 'logged_mailer',
+                'class' => ['name' => ContainerFactoryAuditedMailer::class, 'arguments' => ['@.inner']],
+            ],
+        ]);
+
+        $cache = new \Flexi\Infrastructure\Classes\InMemoryCache();
+        $builder = new \Flexi\Infrastructure\Classes\ObjectBuilder($cache);
+        $factory = new ContainerFactory($cache, $builder, $this->servicesDefinitionParser, $this->configFilesProvider);
+        $container = $factory->getInstance();
+
+        $this->assertInstanceOf(ContainerFactoryAuditedMailer::class, $container->get('mailer'));
+        $this->assertSame('audited:logged:base', $container->get('mailer')->send());
+    }
+
+    public function testNewContainerDoesNotRetainDefinitionsFromPreviousBuild(): void
+    {
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturnOnConsecutiveCalls(
+            ['/modules/Optional/Config/services.json'],
+            []
+        );
+        $this->servicesDefinitionParser->method('parse')->willReturn([
+            'optional.service' => ['class' => ['name' => ContainerFactoryBaseMailer::class]],
+        ]);
+
+        $cache = new InMemoryCache();
+        $builder = new ObjectBuilder($cache);
+        $factory = new ContainerFactory($cache, $builder, $this->servicesDefinitionParser, $this->configFilesProvider);
+
+        $activeContainer = $factory->getInstance();
+        $inactiveContainer = $factory->getInstance();
+
+        $this->assertTrue($activeContainer->has('optional.service'));
+        $this->assertFalse($inactiveContainer->has('optional.service'));
+    }
+
+    public function testContainerExposesDefinitionSourcesAndAddsSourceToResolutionErrors(): void
+    {
+        $file = '/modules/Mailer/Config/services.json';
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+        $this->configFilesProvider->method('getConfigurationFiles')->willReturn([$file]);
+        $this->servicesDefinitionParser->method('parse')->with($file)->willReturn([
+            'broken.mailer' => ['class' => ['name' => 'MissingMailerClass']],
+        ]);
+
+        $cache = new InMemoryCache();
+        $builder = new ObjectBuilder($cache);
+        $factory = new ContainerFactory($cache, $builder, $this->servicesDefinitionParser, $this->configFilesProvider);
+        $container = $factory->getInstance();
+
+        $this->assertSame(['broken.mailer' => $file], $container->getServiceSources());
+
+        $this->expectException(\Flexi\Domain\Exceptions\ServiceNotFoundException::class);
+        $this->expectExceptionMessage(sprintf('Unable to resolve service "broken.mailer" from %s', $file));
+        $container->get('broken.mailer');
+    }
+
+    public function testDuplicateServiceIdsAcrossFilesAreRejected(): void
+    {
+        $files = ['/modules/One/Config/services.json', '/modules/Two/Config/services.json'];
+        $this->configFilesProvider->method('getAllConfigurationFiles')->willReturn([]);
+        $this->configFilesProvider->expects($this->once())->method('getConfigurationFiles')->willReturn($files);
+        $this->servicesDefinitionParser->method('parse')->willReturn(['shared' => 'TargetService']);
+
+        $factory = new ContainerFactory($this->cache, $this->objectBuilder, $this->servicesDefinitionParser, $this->configFilesProvider);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Service ID "shared" is defined in both');
+        $factory->getInstance();
+    }
+
+    public function testValidatesAllConfigurationFilesBeforeRegisteringServices(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'invalid-route-');
+        file_put_contents($file, json_encode([
+            'routes' => [[
+                'name' => 'health',
+                'path' => '/health',
+                'method' => 'FETCH',
+                'controller' => 'HealthController',
+            ]],
+        ]));
+
+        $this->configFilesProvider
+            ->method('getAllConfigurationFiles')
+            ->willReturn(['routes' => [$file]]);
+        $this->servicesDefinitionParser
+            ->expects($this->never())
+            ->method('parse');
+
+        $factory = new ContainerFactory($this->cache, $this->objectBuilder, $this->servicesDefinitionParser, $this->configFilesProvider);
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Invalid configuration');
+            $factory->getInstance();
+        } finally {
+            unlink($file);
+        }
     }
 
     public function testCreateDefaultWithoutParameters(): void
@@ -130,17 +256,19 @@ class ContainerFactoryTest extends TestCase
             rename($originalComposerPath, $backupPath);
         }
 
-        // Create invalid JSON
-        file_put_contents($invalidComposerPath, '{"invalid": json}');
+        try {
+            file_put_contents($invalidComposerPath, '{"invalid": json}');
 
-        $container = ContainerFactory::createDefault();
+            $container = ContainerFactory::createDefault();
 
-        $this->assertInstanceOf(Container::class, $container);
-
-        // Restore original composer.json
-        unlink($invalidComposerPath);
-        if (file_exists($backupPath)) {
-            rename($backupPath, $originalComposerPath);
+            $this->assertInstanceOf(Container::class, $container);
+        } finally {
+            if (file_exists($invalidComposerPath)) {
+                unlink($invalidComposerPath);
+            }
+            if (file_exists($backupPath)) {
+                rename($backupPath, $originalComposerPath);
+            }
         }
     }
 
@@ -154,15 +282,16 @@ class ContainerFactoryTest extends TestCase
             mkdir($tempDir, 0755, true);
         }
 
-        chdir($tempDir);
+        try {
+            chdir($tempDir);
 
-        $container = ContainerFactory::createDefault();
+            $container = ContainerFactory::createDefault();
 
-        $this->assertInstanceOf(Container::class, $container);
-
-        // Restore original directory
-        chdir($originalDir);
-        rmdir($tempDir);
+            $this->assertInstanceOf(Container::class, $container);
+        } finally {
+            chdir($originalDir);
+            $this->removeDirectory($tempDir);
+        }
     }
 
     public function testGetInstanceWithMockedDependencies(): void
@@ -298,5 +427,73 @@ class ContainerFactoryTest extends TestCase
             $moduleInfo = $detector->getModuleInfo($moduleName);
             $this->assertTrue($moduleInfo === null || is_object($moduleInfo));
         }
+    }
+
+    private function removeDirectory(string $path): void
+    {
+        if (!is_dir($path)) {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+            return;
+        }
+
+        foreach (scandir($path) ?: [] as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $itemPath = $path . DIRECTORY_SEPARATOR . $item;
+            if (is_dir($itemPath)) {
+                $this->removeDirectory($itemPath);
+            } else {
+                unlink($itemPath);
+            }
+        }
+
+        rmdir($path);
+    }
+}
+
+interface ContainerFactoryMailerInterface
+{
+    public function send(): string;
+}
+
+class ContainerFactoryBaseMailer implements ContainerFactoryMailerInterface
+{
+    public function send(): string
+    {
+        return 'base';
+    }
+}
+
+class ContainerFactoryLoggedMailer implements ContainerFactoryMailerInterface
+{
+    private ContainerFactoryMailerInterface $inner;
+
+    public function __construct(ContainerFactoryMailerInterface $inner)
+    {
+        $this->inner = $inner;
+    }
+
+    public function send(): string
+    {
+        return 'logged:'.$this->inner->send();
+    }
+}
+
+class ContainerFactoryAuditedMailer implements ContainerFactoryMailerInterface
+{
+    private ContainerFactoryMailerInterface $inner;
+
+    public function __construct(ContainerFactoryMailerInterface $inner)
+    {
+        $this->inner = $inner;
+    }
+
+    public function send(): string
+    {
+        return 'audited:'.$this->inner->send();
     }
 }
